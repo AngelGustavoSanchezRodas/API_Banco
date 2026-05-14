@@ -6,4 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\API_Banco.Application\API_Banco.Application.csproj" />
+    <ProjectReference Include="..\API_Banco.Domain\API_Banco.Domain.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -12,4 +12,13 @@
     <PackageReference Include="Scalar.AspNetCore" Version="2.14.11" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Controllers\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\API_Banco.Application\API_Banco.Application.csproj" />
+    <ProjectReference Include="..\API_Banco.Infrastructure\API_Banco.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>
