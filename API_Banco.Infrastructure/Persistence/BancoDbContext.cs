@@ -13,10 +13,10 @@ namespace API_Banco.Infrastructure.Persistence
         // REPRESENTACIÓN DE LAS TABLAS EN C# (DbSets)
         // Usamos 'internal' para respetar la visibilidad del Domain
         // ====================================================================
-        internal DbSet<Cliente> Clientes { get; set; }
-        internal DbSet<Cuenta> Cuentas { get; set; }
-        internal DbSet<TarjetaDebito> TarjetasDebito { get; set; }
-        internal DbSet<TransaccionBanco> TransaccionesBanco { get; set; }
+        public DbSet<Cliente> Clientes { get; set; }
+        public DbSet<Cuenta> Cuentas { get; set; }
+        public DbSet<TarjetaDebito> TarjetasDebito { get; set; }
+        public DbSet<TransaccionBanco> TransaccionesBanco { get; set; }
 
         // Nuevas entidades agregadas para soportar la lógica de la capa de Aplicación
         internal DbSet<Estado> Estados { get; set; }
