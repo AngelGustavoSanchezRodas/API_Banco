@@ -15,7 +15,7 @@ namespace API_Banco
             builder.Services.AddDbContext<AppDbContext>(options =>
                 options.UseMySql(
                     connectionString,
-                    ServerVersion.AutoDetect(connectionString) // Esto detecta si es MySQL 8.0, 5.7, etc.
+                    ServerVersion.AutoDetect(connectionString) 
                 )
             );
 
