@@ -1,4 +1,5 @@
 using API_Banco.Application.Persistencia;
+using API_Banco.Domain.Entities;
 
 namespace API_Banco.Application.Interfaces.Repositorios;
 
@@ -11,6 +12,8 @@ public interface ICuentaRepositorio
 
     Task<CuentaResumen?> ObtenerPorNumeroAsync(string noCuenta, CancellationToken cancellationToken = default);
 
+    Task<Cuenta?> ObtenerEntidadPorIdAsync(int idCuenta, CancellationToken cancellationToken = default);
+
     Task<bool> PerteneceAClienteAsync(int idCuenta, int idCliente, CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -19,7 +22,7 @@ public interface ICuentaRepositorio
     Task RegistrarCuentaPendienteAsync(
         string noCuenta,
         decimal saldoInicial,
-        int idCliente,
+        Cliente cliente,
         int idEstado,
         CancellationToken cancellationToken = default);
 

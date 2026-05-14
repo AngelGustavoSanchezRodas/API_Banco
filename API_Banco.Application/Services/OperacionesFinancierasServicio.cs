@@ -32,15 +32,11 @@ public sealed class OperacionesFinancierasServicio(
         if (idTipo is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Tipo de transacción DEPOSITO no configurado.");
 
-        var cuenta = await cuentas.ObtenerPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
+        var cuenta = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
         if (cuenta is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
 
-        var aplicado = await cuentas
-            .IntentarAplicarDeltaSaldoAsync(dto.IdCuenta, dto.Monto, cancellationToken)
-            .ConfigureAwait(false);
-        if (!aplicado)
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("No fue posible aplicar el depósito.");
+        cuenta.Acreditar(dto.Monto);
 
         var ahora = fecha.ObtenerUtcAhora();
         await transacciones
@@ -52,8 +48,7 @@ public sealed class OperacionesFinancierasServicio(
             .ObtenerIdUltimaTransaccionAsync(dto.IdCuenta, ahora, dto.Monto, idTipo.Value, cancellationToken)
             .ConfigureAwait(false);
 
-        var actualizada = await cuentas.ObtenerPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
-        var saldo = actualizada?.Saldo ?? cuenta.Saldo + dto.Monto;
+        var saldo = cuenta.Saldo;
 
         var resultado = new MovimientoFinancieroResultadoDto(
             idTransaccion,
@@ -79,21 +74,20 @@ public sealed class OperacionesFinancierasServicio(
         if (idTipo is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Tipo de transacción RETIRO no configurado.");
 
-        var cuenta = await cuentas.ObtenerPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
+        var cuenta = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
         if (cuenta is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
 
-        if (cuenta.Saldo < dto.Monto)
+        try
+        {
+            cuenta.Debitar(dto.Monto);
+        }
+        catch (Exception ex)
+        {
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
                 "Fondos insuficientes para el retiro.",
-                $"Saldo disponible: {cuenta.Saldo:0.00}, solicitado: {dto.Monto:0.00}.");
-
-        var aplicado = await cuentas
-            .IntentarAplicarDeltaSaldoAsync(dto.IdCuenta, -dto.Monto, cancellationToken)
-            .ConfigureAwait(false);
-        if (!aplicado)
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
-                "No fue posible completar el retiro por disponibilidad de saldo en tiempo real.");
+                ex.Message);
+        }
 
         var ahora = fecha.ObtenerUtcAhora();
         await transacciones
@@ -105,8 +99,7 @@ public sealed class OperacionesFinancierasServicio(
             .ObtenerIdUltimaTransaccionAsync(dto.IdCuenta, ahora, dto.Monto, idTipo.Value, cancellationToken)
             .ConfigureAwait(false);
 
-        var actualizada = await cuentas.ObtenerPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
-        var saldo = actualizada?.Saldo ?? cuenta.Saldo - dto.Monto;
+        var saldo = cuenta.Saldo;
 
         var resultado = new MovimientoFinancieroResultadoDto(
             idTransaccion,

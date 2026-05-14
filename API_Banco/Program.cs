@@ -53,6 +53,7 @@ namespace API_Banco
             builder.Services.AddScoped<ITipoTransaccionRepositorio, TipoTransaccionRepositorio>();
             builder.Services.AddScoped<IEstadoRepositorio, EstadoRepositorio>();
             builder.Services.AddScoped<ITarjetaDebitoRepositorio, TarjetaDebitoRepositorio>();
+            builder.Services.AddScoped<IRegistroPagoServicioRepositorio, RegistroPagoServicioRepositorio>();
 
             // 6. Inyección de Servicios Externos (Mocks e Integraciones)
             builder.Services.AddScoped<IValidadorIdentificadorServicio, ValidadorIdentificadorMock>(); 

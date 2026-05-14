@@ -17,6 +17,8 @@ namespace API_Banco.Infrastructure.Persistence
         public DbSet<Cuenta> Cuentas { get; set; }
         public DbSet<TarjetaDebito> TarjetasDebito { get; set; }
         public DbSet<TransaccionBanco> TransaccionesBanco { get; set; }
+        public DbSet<RegistroPagoServicio> RegistroPagosServicios { get; set; }
+        public DbSet<CuentaComision> CuentasComision { get; set; }
 
         // Nuevas entidades agregadas para soportar la lógica de la capa de Aplicación
         internal DbSet<Estado> Estados { get; set; }
@@ -53,7 +55,7 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.Property(e => e.NoCuenta).HasColumnName("no_cuenta");
                 entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
                 entity.Property(e => e.Saldo).HasColumnName("saldo_actual");
-                entity.Property(e => e.IdEstado).HasColumnName("IdEstado");
+                entity.Property(e => e.IdEstado).HasColumnName("id_estado");
             });
 
             // 3. Configuración de TARJETA DE DEBITO
@@ -65,7 +67,7 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.Property(e => e.NumeroTarjeta).HasColumnName("no_tarjeta");
                 entity.Property(e => e.PinHash).HasColumnName("pin_hash");
                 entity.Property(e => e.FechaVencimiento).HasColumnName("fecha_vencimiento");
-                entity.Property(e => e.IdEstado).HasColumnName("IdEstado");
+                entity.Property(e => e.IdEstado).HasColumnName("id_estado");
 
                 // Relación 1 a 1 con Cuenta
                 entity.HasOne(t => t.Cuenta)
@@ -81,7 +83,7 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.Property(e => e.IdCuenta).HasColumnName("id_cuenta");
                 entity.Property(e => e.Monto).HasColumnName("monto");
                 entity.Property(e => e.Fecha).HasColumnName("fecha_transaccion");
-                entity.Property(e => e.IdTipoTransaccion).HasColumnName("IdTipoTransaccion");
+                entity.Property(e => e.IdTipoTransaccion).HasColumnName("id_tipo_transaccion");
 
                 entity.HasOne(t => t.TipoTransaccion)
                       .WithMany()
@@ -89,8 +91,42 @@ namespace API_Banco.Infrastructure.Persistence
             });
 
             // 5. Catálogos nuevos
-            modelBuilder.Entity<Estado>().ToTable("estado").HasKey(e => e.IdEstado); //
-            modelBuilder.Entity<TipoTransaccion>().ToTable("tipo_transaccion").HasKey(t => t.IdTipoTransaccion); //
+            modelBuilder.Entity<Estado>(entity => {
+                entity.ToTable("estado");
+                entity.HasKey(e => e.IdEstado);
+                entity.Property(e => e.IdEstado).HasColumnName("id_estado");
+                entity.Property(e => e.Descripcion).HasColumnName("descripcion");
+            });
+
+            modelBuilder.Entity<TipoTransaccion>(entity => {
+                entity.ToTable("tipo_transaccion");
+                entity.HasKey(t => t.IdTipoTransaccion);
+                entity.Property(t => t.IdTipoTransaccion).HasColumnName("id_tipo_transaccion");
+                entity.Property(t => t.Descripcion).HasColumnName("descripcion");
+            });
+
+            // 6. Registro Pagos Servicio
+            modelBuilder.Entity<RegistroPagoServicio>(entity => {
+                entity.ToTable("registro_pagos_servicios");
+                entity.HasKey(e => e.IdRegistroPago);
+                entity.Property(e => e.IdRegistroPago).HasColumnName("id_registro_pago");
+                entity.Property(e => e.IdTransaccionOrigen).HasColumnName("id_transaccion_origen");
+                entity.Property(e => e.EntidadServicio).HasColumnName("entidad_servicio");
+                entity.Property(e => e.IdentificadorServicio).HasColumnName("identificador_servicio");
+                entity.Property(e => e.MontoPagado).HasColumnName("monto_pagado");
+
+                entity.HasOne(e => e.TransaccionOrigen)
+                      .WithMany()
+                      .HasForeignKey(e => e.IdTransaccionOrigen);
+            });
+
+            modelBuilder.Entity<CuentaComision>(entity => {
+                entity.ToTable("cuenta_comision_banco");
+                entity.HasKey(e => e.IdCuentaComision);
+                entity.Property(e => e.IdCuentaComision).HasColumnName("id_cuenta_comision");
+                entity.Property(e => e.NombreCuenta).HasColumnName("nombre_cuenta");
+                entity.Property(e => e.SaldoAcumulado).HasColumnName("saldo_acumulado");
+            });
         }
     }
 }

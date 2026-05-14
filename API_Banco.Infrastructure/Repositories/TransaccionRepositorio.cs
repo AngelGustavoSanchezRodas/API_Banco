@@ -20,6 +20,20 @@ public class TransaccionRepositorio(BancoDbContext context) : ITransaccionReposi
         await context.TransaccionesBanco.AddAsync(transaccion, cancellationToken);
     }
 
+    public async Task<TransaccionBanco> CrearMovimientoPendienteAsync(int idCuenta, int idTipoTransaccion, decimal monto, DateTime fechaUtc, CancellationToken cancellationToken = default)
+    {
+        var transaccion = new TransaccionBanco
+        {
+            IdCuenta = idCuenta,
+            IdTipoTransaccion = idTipoTransaccion,
+            Monto = monto,
+            Fecha = fechaUtc
+        };
+
+        await context.TransaccionesBanco.AddAsync(transaccion, cancellationToken);
+        return transaccion;
+    }
+
     public async Task<int> ObtenerIdUltimaTransaccionAsync(int idCuenta, DateTime fechaUtc, decimal monto, int idTipoTransaccion, CancellationToken cancellationToken = default)
     {
         var tx = await context.TransaccionesBanco

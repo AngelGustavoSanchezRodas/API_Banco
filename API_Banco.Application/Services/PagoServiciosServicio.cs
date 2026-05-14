@@ -6,6 +6,7 @@ using API_Banco.Application.Interfaces;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services.Internos;
+using API_Banco.Domain.Entities;
 
 namespace API_Banco.Application.Services;
 
@@ -17,6 +18,7 @@ public sealed class PagoServiciosServicio(
     ICuentaRepositorio cuentas,
     ITransaccionRepositorio transacciones,
     ITipoTransaccionRepositorio tiposTransaccion,
+    IRegistroPagoServicioRepositorio registrosPago,
     IConfiguracionDistribucionPagos distribucion,
     INotificacionEmpresaServicio notificacionEmpresa,
     IUnidadDeTrabajo unidadDeTrabajo,
@@ -99,32 +101,37 @@ public sealed class PagoServiciosServicio(
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
                 "La cuenta pagadora no puede coincidir con la cuenta prestadora o de comisiones.");
 
-        var cuentaPagadora = await cuentas.ObtenerPorIdAsync(dto.IdCuentaPagadora, cancellationToken).ConfigureAwait(false);
+        var cuentaPagadora = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuentaPagadora, cancellationToken).ConfigureAwait(false);
         if (cuentaPagadora is null)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La cuenta pagadora no existe.");
 
-        if (cuentaPagadora.Saldo < dto.Monto)
+        try
+        {
+            cuentaPagadora.Debitar(dto.Monto);
+        }
+        catch (Exception ex)
+        {
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
                 "Saldo insuficiente para ejecutar el pago.",
-                $"Disponible: {cuentaPagadora.Saldo:0.00}, requerido: {dto.Monto:0.00}.");
+                ex.Message);
+        }
 
         var (montoPrestadora, comisionBanco) = DistribuidorPago95Por5.Calcular(dto.Monto);
         var ahora = fecha.ObtenerUtcAhora();
 
-        if (!await cuentas.IntentarAplicarDeltaSaldoAsync(dto.IdCuentaPagadora, -dto.Monto, cancellationToken).ConfigureAwait(false))
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                "No se pudo debitar la cuenta del cuentahabiente (validación de saldo en tiempo real).");
+        var cuentaPrestadora = await cuentas.ObtenerEntidadPorIdAsync(idCuentaPrestadora, cancellationToken).ConfigureAwait(false);
+        if (cuentaPrestadora is null)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La cuenta de la empresa prestadora no existe.");
 
-        if (!await cuentas.IntentarAplicarDeltaSaldoAsync(idCuentaPrestadora, montoPrestadora, cancellationToken).ConfigureAwait(false))
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                "No se pudo acreditar a la cuenta de la empresa prestadora. Revise la configuración y reintente.");
+        var cuentaComisiones = await cuentas.ObtenerEntidadPorIdAsync(idCuentaComisiones, cancellationToken).ConfigureAwait(false);
+        if (cuentaComisiones is null)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La cuenta de comisiones del banco no existe.");
 
-        if (!await cuentas.IntentarAplicarDeltaSaldoAsync(idCuentaComisiones, comisionBanco, cancellationToken).ConfigureAwait(false))
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                "No se pudo acreditar la comisión del banco. Revise la configuración y reintente.");
+        cuentaPrestadora.Acreditar(montoPrestadora);
+        cuentaComisiones.Acreditar(comisionBanco);
 
-        await transacciones
-            .RegistrarMovimientoPendienteAsync(dto.IdCuentaPagadora, idTipoDebito.Value, dto.Monto, ahora, cancellationToken)
+        var transaccionDebito = await transacciones
+            .CrearMovimientoPendienteAsync(dto.IdCuentaPagadora, idTipoDebito.Value, dto.Monto, ahora, cancellationToken)
             .ConfigureAwait(false);
         await transacciones
             .RegistrarMovimientoPendienteAsync(idCuentaPrestadora, idTipoPrestadora.Value, montoPrestadora, ahora, cancellationToken)
@@ -132,6 +139,17 @@ public sealed class PagoServiciosServicio(
         await transacciones
             .RegistrarMovimientoPendienteAsync(idCuentaComisiones, idTipoComision.Value, comisionBanco, ahora, cancellationToken)
             .ConfigureAwait(false);
+
+        var registroPago = new RegistroPagoServicio
+        {
+            TransaccionOrigen = transaccionDebito,
+            EntidadServicio = dto.TipoServicio.ToString(),
+            IdentificadorServicio = dto.Identificador.Trim(),
+            MontoPagado = dto.Monto
+        };
+
+        await registrosPago.RegistrarAsync(registroPago, cancellationToken).ConfigureAwait(false);
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
 
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
 
@@ -145,8 +163,7 @@ public sealed class PagoServiciosServicio(
             .ObtenerIdUltimaTransaccionAsync(idCuentaComisiones, ahora, comisionBanco, idTipoComision.Value, cancellationToken)
             .ConfigureAwait(false);
 
-        var cuentaActualizada = await cuentas.ObtenerPorIdAsync(dto.IdCuentaPagadora, cancellationToken).ConfigureAwait(false);
-        var saldoPosterior = cuentaActualizada?.Saldo ?? cuentaPagadora.Saldo - dto.Monto;
+        var saldoPosterior = cuentaPagadora.Saldo;
 
         var notificacion = new NotificacionPagoEmpresaDto(
             dto.TipoServicio,
@@ -163,7 +180,6 @@ public sealed class PagoServiciosServicio(
         }
         catch
         {
-            // El pago ya quedó persistido; la infraestructura debe implementar reintentos o cola de salida (outbox).
             notificacionEnviada = false;
         }
 

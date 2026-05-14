@@ -26,19 +26,24 @@ public class CuentaRepositorio(BancoDbContext context) : ICuentaRepositorio
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public async Task<Cuenta?> ObtenerEntidadPorIdAsync(int idCuenta, CancellationToken cancellationToken = default)
+    {
+        return await context.Cuentas.FirstOrDefaultAsync(c => c.IdCuenta == idCuenta, cancellationToken);
+    }
+
     public async Task<bool> PerteneceAClienteAsync(int idCuenta, int idCliente, CancellationToken cancellationToken = default)
     {
         return await context.Cuentas
             .AnyAsync(c => c.IdCuenta == idCuenta && c.IdCliente == idCliente, cancellationToken);
     }
 
-    public async Task RegistrarCuentaPendienteAsync(string noCuenta, decimal saldoInicial, int idCliente, int idEstado, CancellationToken cancellationToken = default)
+    public async Task RegistrarCuentaPendienteAsync(string noCuenta, decimal saldoInicial, Cliente cliente, int idEstado, CancellationToken cancellationToken = default)
     {
         var cuenta = new Cuenta
         {
             NoCuenta = noCuenta,
             Saldo = saldoInicial,
-            IdCliente = idCliente,
+            Cliente = cliente,
             IdEstado = idEstado
         };
         await context.Cuentas.AddAsync(cuenta, cancellationToken);

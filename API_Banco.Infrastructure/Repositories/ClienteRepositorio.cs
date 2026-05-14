@@ -31,6 +31,11 @@ namespace API_Banco.Infrastructure.Repositories
             return new CuentahabienteResumen(cliente.IdCliente, cliente.Dpi, cliente.Nombre, cliente.Apellido);
         }
 
+        public async Task<Cliente?> ObtenerEntidadPorIdAsync(int idCliente, CancellationToken cancellationToken = default)
+        {
+            return await _context.Clientes.FirstOrDefaultAsync(c => c.IdCliente == idCliente, cancellationToken);
+        }
+
         public async Task<CuentahabienteResumen?> ObtenerPorDpiAsync(string dpi, CancellationToken cancellationToken = default)
         {
             var cliente = await _context.Clientes

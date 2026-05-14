@@ -65,7 +65,7 @@ public sealed class CuentahabienteServicio(
         if (dto.SaldoInicial < 0)
             return ResultadoOperacion<CuentaAbiertaDto>.Fallo("El saldo inicial no puede ser negativo.");
 
-        var cliente = await clientes.ObtenerPorIdAsync(dto.IdCliente, cancellationToken).ConfigureAwait(false);
+        var cliente = await clientes.ObtenerEntidadPorIdAsync(dto.IdCliente, cancellationToken).ConfigureAwait(false);
         if (cliente is null)
             return ResultadoOperacion<CuentaAbiertaDto>.Fallo("No se encontró el cuentahabiente.");
 
@@ -75,7 +75,7 @@ public sealed class CuentahabienteServicio(
 
         var noCuenta = await numerosCuenta.GenerarSiguienteNumeroCuentaAsync(cancellationToken).ConfigureAwait(false);
         await cuentas
-            .RegistrarCuentaPendienteAsync(noCuenta, dto.SaldoInicial, cliente.IdCliente, idEstadoActivo.Value, cancellationToken)
+            .RegistrarCuentaPendienteAsync(noCuenta, dto.SaldoInicial, cliente, idEstadoActivo.Value, cancellationToken)
             .ConfigureAwait(false);
 
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);

@@ -1,4 +1,5 @@
 using API_Banco.Application.Persistencia;
+using API_Banco.Domain.Entities;
 
 namespace API_Banco.Application.Interfaces.Repositorios;
 
@@ -11,6 +12,13 @@ public interface ITransaccionRepositorio
     /// Registra un movimiento pendiente de confirmación con <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>.
     /// </summary>
     Task RegistrarMovimientoPendienteAsync(
+        int idCuenta,
+        int idTipoTransaccion,
+        decimal monto,
+        DateTime fechaUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<TransaccionBanco> CrearMovimientoPendienteAsync(
         int idCuenta,
         int idTipoTransaccion,
         decimal monto,

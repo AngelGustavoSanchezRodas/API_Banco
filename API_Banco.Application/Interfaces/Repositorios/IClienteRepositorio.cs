@@ -1,4 +1,5 @@
 using API_Banco.Application.Persistencia;
+using API_Banco.Domain.Entities;
 
 namespace API_Banco.Application.Interfaces.Repositorios;
 
@@ -12,6 +13,8 @@ public interface IClienteRepositorio
     Task<CuentahabienteResumen?> ObtenerPorIdAsync(int idCliente, CancellationToken cancellationToken = default);
 
     Task<CuentahabienteResumen?> ObtenerPorDpiAsync(string dpi, CancellationToken cancellationToken = default);
+
+    Task<Cliente?> ObtenerEntidadPorIdAsync(int idCliente, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Registra un nuevo cliente pendiente de confirmación con <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>.
