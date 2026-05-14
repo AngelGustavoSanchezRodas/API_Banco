@@ -1,8 +1,10 @@
+using API_Banco.Application.Interfaces;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services;
 using API_Banco.Infrastructure.Persistence;
 using API_Banco.Infrastructure.Repositories;
+using API_Banco.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
@@ -41,12 +43,23 @@ namespace API_Banco
             builder.Services.AddScoped<IOperacionesFinancierasServicio, OperacionesFinancierasServicio>();
             builder.Services.AddScoped<IPagoServiciosServicio, PagoServiciosServicio>();
             builder.Services.AddScoped<IBitacoraServicio, BitacoraServicio>();
+            builder.Services.AddSingleton<IProveedorFecha, ProveedorFechaSistema>();
 
             // 5. Inyección de la Capa de Infraestructura (Repositorios)
             builder.Services.AddScoped<IUnidadDeTrabajo, UnidadDeTrabajo>();
+            builder.Services.AddScoped<IClienteRepositorio, ClienteRepositorio>(); 
             builder.Services.AddScoped<ICuentaRepositorio, CuentaRepositorio>();
             builder.Services.AddScoped<ITransaccionRepositorio, TransaccionRepositorio>();
             builder.Services.AddScoped<ITipoTransaccionRepositorio, TipoTransaccionRepositorio>();
+            builder.Services.AddScoped<IEstadoRepositorio, EstadoRepositorio>();
+            builder.Services.AddScoped<ITarjetaDebitoRepositorio, TarjetaDebitoRepositorio>();
+
+            // 6. Inyección de Servicios Externos (Mocks e Integraciones)
+            builder.Services.AddScoped<IValidadorIdentificadorServicio, ValidadorIdentificadorMock>(); 
+            builder.Services.AddScoped<INotificacionEmpresaServicio, NotificacionEmpresaMock>();
+            builder.Services.AddScoped<INumeroCuentaGenerador, GeneradoresMock>();
+            builder.Services.AddScoped<INumeroTarjetaGenerador, GeneradoresMock>();
+            builder.Services.AddScoped<IConfiguracionDistribucionPagos, ConfiguracionPagosMock>();
 
             var app = builder.Build();
 
