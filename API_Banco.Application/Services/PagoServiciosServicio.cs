@@ -151,8 +151,6 @@ public sealed class PagoServiciosServicio(
         await registrosPago.RegistrarAsync(registroPago, cancellationToken).ConfigureAwait(false);
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
 
-        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
-
         var idDebito = await transacciones
             .ObtenerIdUltimaTransaccionAsync(dto.IdCuentaPagadora, ahora, dto.Monto, idTipoDebito.Value, cancellationToken)
             .ConfigureAwait(false);

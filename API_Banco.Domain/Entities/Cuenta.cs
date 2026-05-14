@@ -1,4 +1,6 @@
-﻿namespace API_Banco.Domain.Entities
+﻿using System;
+
+namespace API_Banco.Domain.Entities
 {
     public class Cuenta
     {
