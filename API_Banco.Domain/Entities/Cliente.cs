@@ -1,6 +1,6 @@
 ﻿namespace API_Banco.Domain.Entities
 {
-    internal class Cliente
+    public class Cliente
     {
         public int IdCliente { get; set; }
         public required string Dpi { get; set; }

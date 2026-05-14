@@ -4,7 +4,7 @@ using System.Text;
 
 namespace API_Banco.Domain.Entities
 {
-    internal class TransaccionBanco
+    public class TransaccionBanco
     {
         public int IdTransaccion { get; set; }
         public decimal Monto { get; set; }

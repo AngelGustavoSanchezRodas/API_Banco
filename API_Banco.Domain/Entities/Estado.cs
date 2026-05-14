@@ -4,7 +4,7 @@ using System.Text;
 
 namespace API_Banco.Domain.Entities
 {
-    internal class Estado
+    public class Estado
     {
         public int IdEstado { get; set; }
         public required string Descripcion { get; set; }
