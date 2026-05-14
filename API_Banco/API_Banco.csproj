@@ -13,10 +13,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Controllers\" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\API_Banco.Application\API_Banco.Application.csproj" />
     <ProjectReference Include="..\API_Banco.Infrastructure\API_Banco.Infrastructure.csproj" />
   </ItemGroup>

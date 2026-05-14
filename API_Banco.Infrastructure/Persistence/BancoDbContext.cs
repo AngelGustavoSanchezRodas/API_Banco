@@ -13,11 +13,14 @@ namespace API_Banco.Infrastructure.Persistence
         // REPRESENTACIÓN DE LAS TABLAS EN C# (DbSets)
         // Usamos 'internal' para respetar la visibilidad del Domain
         // ====================================================================
-        // se dejaron pendientes Estado y TipoTransaccion porque no se especificó en la base de datos, pero se pueden agregar fácilmente como entidades adicionales si es necesario.
         internal DbSet<Cliente> Clientes { get; set; }
         internal DbSet<Cuenta> Cuentas { get; set; }
         internal DbSet<TarjetaDebito> TarjetasDebito { get; set; }
         internal DbSet<TransaccionBanco> TransaccionesBanco { get; set; }
+
+        // Nuevas entidades agregadas para soportar la lógica de la capa de Aplicación
+        internal DbSet<Estado> Estados { get; set; }
+        internal DbSet<TipoTransaccion> TiposTransaccion { get; set; }
 
         // ====================================================================
         // CONEXIÓN EXACTA CON LOS NOMBRES EN MySQL
@@ -31,6 +34,10 @@ namespace API_Banco.Infrastructure.Persistence
             modelBuilder.Entity<Cuenta>().ToTable("cuenta_bancaria");
             modelBuilder.Entity<TarjetaDebito>().ToTable("tarjeta_debito");
             modelBuilder.Entity<TransaccionBanco>().ToTable("bitacora_transacciones");
+
+            // Nombres de tabla para las nuevas entidades
+            modelBuilder.Entity<Estado>().ToTable("estado");
+            modelBuilder.Entity<TipoTransaccion>().ToTable("tipo_transaccion");
         }
     }
 }

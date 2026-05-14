@@ -1,4 +1,8 @@
+using API_Banco.Application.Interfaces.Servicios;
+using API_Banco.Application.Services;
+using API_Banco.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 
 namespace API_Banco
 {
@@ -12,7 +16,7 @@ namespace API_Banco
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
             // 2. Registrar el DbContext con Pomelo MySQL
-            builder.Services.AddDbContext<AppDbContext>(options =>
+            builder.Services.AddDbContext<BancoDbContext>(options =>
                 options.UseMySql(
                     connectionString,
                     ServerVersion.AutoDetect(connectionString) 
@@ -25,12 +29,18 @@ namespace API_Banco
            
             builder.Services.AddOpenApi();
 
+            //
+            builder.Services.AddScoped<ICuentahabienteServicio, CuentahabienteServicio>();
+            builder.Services.AddScoped<IOperacionesFinancierasServicio, OperacionesFinancierasServicio>();
+            builder.Services.AddScoped<IPagoServiciosServicio, PagoServiciosServicio>();
+            builder.Services.AddScoped<IBitacoraServicio, BitacoraServicio>();
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
             {
-
+                app.MapScalarApiReference();
                 app.MapOpenApi();
             }
 
