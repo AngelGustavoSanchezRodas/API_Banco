@@ -3,7 +3,7 @@
     public class CuentaComision
     {
         public int IdCuentaComision { get; set; }
-        public required string NombreCuenta { get; set; } // Ej: "COMISION_SERVICIOS"
+        public required string NombreCuenta { get; set; } 
         public decimal SaldoAcumulado { get; set; }
     }
 }
