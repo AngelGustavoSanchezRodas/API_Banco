@@ -39,7 +39,7 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.Property(e => e.Nombre).HasColumnName("nombre");
                 entity.Property(e => e.Apellido).HasColumnName("apellido");
 
-                // FIX: El puente mágico entre C# (Celular) y MySQL (telefono)
+                
                 entity.Property(e => e.Celular).HasColumnName("telefono");
 
                 entity.Property(e => e.Email).HasColumnName("email");
