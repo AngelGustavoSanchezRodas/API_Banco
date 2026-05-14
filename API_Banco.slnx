@@ -1,6 +1,3 @@
 <Solution>
-  <Project Path="../API_Banco.Application/API_Banco.Application.csproj" Id="a9d765ca-0c77-40a9-a152-7e838ba57b0e" />
-  <Project Path="../API_Banco.Domain/API_Banco.Domain.csproj" Id="31dc9168-28ed-4aaa-9a2f-f70f4b1b2027" />
-  <Project Path="../API_Banco.Infraestructure/API_Banco.Infraestructure.csproj" Id="9887c41d-3416-43ed-ade3-cc58ff25c2af" />
   <Project Path="API_Banco.csproj" />
 </Solution>
