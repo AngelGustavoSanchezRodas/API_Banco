@@ -29,64 +29,68 @@ namespace API_Banco.Infrastructure.Persistence
         {
             base.OnModelCreating(modelBuilder);
 
-            // Mapeo de tablas
-            modelBuilder.Entity<Cliente>().ToTable("cliente");
-            modelBuilder.Entity<Cuenta>().ToTable("cuenta_bancaria");
-            modelBuilder.Entity<TarjetaDebito>().ToTable("tarjeta_debito");
-            modelBuilder.Entity<TransaccionBanco>().ToTable("bitacora_transacciones");
-            modelBuilder.Entity<Estado>().ToTable("estado");
-            modelBuilder.Entity<TipoTransaccion>().ToTable("tipo_transaccion");
+            // 1. Configuración de CLIENTE
+            modelBuilder.Entity<Cliente>(entity => {
+                entity.ToTable("cliente");
+                entity.HasKey(e => e.IdCliente);
 
-            // ==============================================================
-            // 1. CONFIGURACIÓN DE LLAVES PRIMARIAS (Para evitar el próximo error)
-            // ==============================================================
-            modelBuilder.Entity<Cliente>().HasKey(c => c.IdCliente);
-            modelBuilder.Entity<Cuenta>().HasKey(c => c.IdCuenta);
-            modelBuilder.Entity<TarjetaDebito>().HasKey(t => t.IdTarjeta);
-            modelBuilder.Entity<TransaccionBanco>().HasKey(t => t.IdTransaccion);
-            modelBuilder.Entity<Estado>().HasKey(e => e.IdEstado);
-            modelBuilder.Entity<TipoTransaccion>().HasKey(t => t.IdTipoTransaccion);
+                entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
+                entity.Property(e => e.Dpi).HasColumnName("dpi");
+                entity.Property(e => e.Nombre).HasColumnName("nombre");
+                entity.Property(e => e.Apellido).HasColumnName("apellido");
 
-            // ==============================================================
-            // 2. FIX: CONFIGURACIÓN DE LA RELACIÓN 1 A 1 
-            // ==============================================================
-            modelBuilder.Entity<TarjetaDebito>()
-                .HasOne(t => t.Cuenta)
-                .WithOne(c => c.Tarjeta)
-                .HasForeignKey<TarjetaDebito>(t => t.IdCuenta);
+                // FIX: El puente mágico entre C# (Celular) y MySQL (telefono)
+                entity.Property(e => e.Celular).HasColumnName("telefono");
 
-            modelBuilder.Entity<TransaccionBanco>(entity =>
-            {
-                entity.ToTable("bitacora_transacciones"); 
-                entity.HasKey(e => e.IdTransaccion);
-
-                entity.Property(e => e.IdTransaccion).HasColumnName("id_transaccion");
-                entity.Property(e => e.IdCuenta).HasColumnName("id_cuenta");
-                entity.Property(e => e.Monto).HasColumnName("monto");
-                entity.Property(e => e.Fecha).HasColumnName("fecha_transaccion");
-                entity.Property(e => e.IdTipoTransaccion).HasColumnName("IdTipoTransaccion"); 
-
-                // FIX: Especificar la relación y la columna real de la llave foránea
-                entity.HasOne(d => d.TipoTransaccion)
-                      .WithMany(p => p.Transacciones)
-                      .HasForeignKey(d => d.IdTipoTransaccion) 
-                      .OnDelete(DeleteBehavior.ClientSetNull);
+                entity.Property(e => e.Email).HasColumnName("email");
             });
 
-            modelBuilder.Entity<Cuenta>(entity =>
-            {
+            // 2. Configuración de CUENTA BANCARIA
+            modelBuilder.Entity<Cuenta>(entity => {
+                entity.ToTable("cuenta_bancaria"); //
+                entity.HasKey(e => e.IdCuenta); //
                 entity.Property(e => e.IdCuenta).HasColumnName("id_cuenta");
                 entity.Property(e => e.NoCuenta).HasColumnName("no_cuenta");
                 entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
                 entity.Property(e => e.Saldo).HasColumnName("saldo_actual");
+                entity.Property(e => e.IdEstado).HasColumnName("IdEstado");
             });
 
-            modelBuilder.Entity<Cliente>(entity =>
-            {
-                entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
+            // 3. Configuración de TARJETA DE DEBITO
+            modelBuilder.Entity<TarjetaDebito>(entity => {
+                entity.ToTable("tarjeta_debito"); //
+                entity.HasKey(e => e.IdTarjeta); //
+                entity.Property(e => e.IdTarjeta).HasColumnName("id_tarjeta");
+                entity.Property(e => e.IdCuenta).HasColumnName("id_cuenta");
+                entity.Property(e => e.NumeroTarjeta).HasColumnName("no_tarjeta");
+                entity.Property(e => e.PinHash).HasColumnName("pin_hash");
+                entity.Property(e => e.FechaVencimiento).HasColumnName("fecha_vencimiento");
+                entity.Property(e => e.IdEstado).HasColumnName("IdEstado");
+
+                // Relación 1 a 1 con Cuenta
+                entity.HasOne(t => t.Cuenta)
+                      .WithOne(c => c.Tarjeta)
+                      .HasForeignKey<TarjetaDebito>(t => t.IdCuenta);
             });
 
+            // 4. Configuración de BITÁCORA (Transacciones)
+            modelBuilder.Entity<TransaccionBanco>(entity => {
+                entity.ToTable("bitacora_transacciones"); //
+                entity.HasKey(e => e.IdTransaccion); //
+                entity.Property(e => e.IdTransaccion).HasColumnName("id_transaccion");
+                entity.Property(e => e.IdCuenta).HasColumnName("id_cuenta");
+                entity.Property(e => e.Monto).HasColumnName("monto");
+                entity.Property(e => e.Fecha).HasColumnName("fecha_transaccion");
+                entity.Property(e => e.IdTipoTransaccion).HasColumnName("IdTipoTransaccion");
 
+                entity.HasOne(t => t.TipoTransaccion)
+                      .WithMany()
+                      .HasForeignKey(t => t.IdTipoTransaccion);
+            });
+
+            // 5. Catálogos nuevos
+            modelBuilder.Entity<Estado>().ToTable("estado").HasKey(e => e.IdEstado); //
+            modelBuilder.Entity<TipoTransaccion>().ToTable("tipo_transaccion").HasKey(t => t.IdTipoTransaccion); //
         }
     }
 }
