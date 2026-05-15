@@ -56,13 +56,19 @@ namespace API_Banco.Controllers
         }
     }
 
-    public sealed record ActivarCuentaRequestDto(
+    // 1. DTO para Activar Cuenta (Sin la palabra 'property:')
+    public record ActivarCuentaRequestDto(
         int IdCuenta,
-        [property: Range(typeof(decimal), "0.01", "79228162514264337593543950335")] decimal MontoDeposito);
+        [Range(typeof(decimal), "0.01", "79228162514264337593543950335", ErrorMessage = "El monto debe ser mayor a 0.")]
+        decimal MontoDeposito
+    );
 
-    public sealed record TransferirRequestDto(
+    // 2. DTO para Transferir (Sin la palabra 'property:')
+    public record TransferirRequestDto(
         int IdCuentaOrigen,
         int IdCuentaDestino,
-        [property: Range(typeof(decimal), "0.01", "79228162514264337593543950335")] decimal Monto,
-        string Descripcion);
+        [Range(typeof(decimal), "0.01", "79228162514264337593543950335", ErrorMessage = "El monto debe ser mayor a 0.")]
+        decimal Monto,
+        string Descripcion
+    );
 }

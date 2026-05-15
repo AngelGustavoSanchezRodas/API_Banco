@@ -7,6 +7,8 @@ using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services.Internos;
 using API_Banco.Domain.Entities;
+using System.Net.Http;
+using System.Text.Json;
 
 namespace API_Banco.Application.Services;
 
@@ -15,6 +17,7 @@ namespace API_Banco.Application.Services;
 /// </summary>
 public sealed class PagoServiciosServicio(
     IValidadorIdentificadorServicio validadorIdentificador,
+    IConsultaDeudaServicio consultaDeudaServicio,
     ICuentaRepositorio cuentas,
     ITransaccionRepositorio transacciones,
     ITipoTransaccionRepositorio tiposTransaccion,
@@ -209,15 +212,24 @@ public sealed class PagoServiciosServicio(
         var tipo = (TipoServicioPublico)tipoServicio;
         var identificadorLimpio = identificador.Trim();
 
-        var validacion = await validadorIdentificador
-            .ValidarAsync(tipo, identificadorLimpio)
-            .ConfigureAwait(false);
-        if (!validacion.EsValido)
+        try
+        {
+            var deuda = await consultaDeudaServicio
+                .ConsultarDeudaAsync(tipo, identificadorLimpio)
+                .ConfigureAwait(false);
+            return ResultadoOperacion<decimal>.Ok(deuda);
+        }
+        catch (HttpRequestException ex)
+        {
             return ResultadoOperacion<decimal>.Fallo(
-                validacion.Mensaje ?? "No se pudo consultar la deuda en el proveedor externo.");
-
-        var hash = Math.Abs(HashCode.Combine(tipoServicio, identificadorLimpio.ToUpperInvariant()));
-        var deuda = ((hash % 90000) + 1000) / 100m;
-        return ResultadoOperacion<decimal>.Ok(deuda);
+                "No se pudo consultar la deuda en el proveedor externo.",
+                ex.Message);
+        }
+        catch (JsonException ex)
+        {
+            return ResultadoOperacion<decimal>.Fallo(
+                "La respuesta del proveedor externo no tiene el formato esperado.",
+                ex.Message);
+        }
     }
 }

@@ -2,6 +2,7 @@ using API_Banco.Application.Interfaces;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services;
+using API_Banco.Infrastructure.Integrations;
 using API_Banco.Infrastructure.Persistence;
 using API_Banco.Infrastructure.Repositories;
 using API_Banco.Infrastructure.Services;
@@ -56,8 +57,12 @@ namespace API_Banco
             builder.Services.AddScoped<IRegistroPagoServicioRepositorio, RegistroPagoServicioRepositorio>();
 
             // 6. Inyección de Servicios Externos (Mocks e Integraciones)
-            builder.Services.AddScoped<IValidadorIdentificadorServicio, ValidadorIdentificadorMock>(); 
-            builder.Services.AddScoped<INotificacionEmpresaServicio, NotificacionEmpresaMock>();
+            builder.Services.AddHttpClient("UniversidadApi", client =>
+                client.BaseAddress = new Uri("https://sistemapagosuniversidad.azurewebsites.net/"));
+            builder.Services.AddScoped<GestorIntegracionServicios>();
+            builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
+            builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
+            builder.Services.AddScoped<IConsultaDeudaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
             builder.Services.AddScoped<INumeroCuentaGenerador, GeneradoresMock>();
             builder.Services.AddScoped<INumeroTarjetaGenerador, GeneradoresMock>();
             builder.Services.AddScoped<IConfiguracionDistribucionPagos, ConfiguracionPagosMock>();
@@ -65,7 +70,7 @@ namespace API_Banco
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
-            if (app.Environment.IsDevelopment())
+            if (app.Environment.IsDevelopment()  || app.Environment.IsProduction())
             {
                 app.MapScalarApiReference();
                 app.MapOpenApi();
