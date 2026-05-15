@@ -26,17 +26,6 @@ namespace API_Banco.Controllers
             return Ok(resultado.Valor);
         }
 
-        [HttpPost("cuenta")]
-        public async Task<IActionResult> AbrirCuenta([FromBody] AbrirCuentaDto dto)
-        {
-            var resultado = await _cuentahabienteServicio.AbrirCuentaConSaldoInicialAsync(dto);
-
-            if (!resultado.Exito)
-                return BadRequest(new { error = resultado.MensajeError, detalles = resultado.Detalles });
-
-            return Ok(resultado.Valor);
-        }
-
         [HttpPost("tarjeta")]
         public async Task<IActionResult> AsociarTarjeta([FromBody] AsociarTarjetaDebitoDto dto)
         {
