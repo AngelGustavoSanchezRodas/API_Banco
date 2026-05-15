@@ -21,9 +21,10 @@ public interface ICuentaRepositorio
     /// </summary>
     Task RegistrarCuentaPendienteAsync(
         string noCuenta,
-        decimal saldoInicial,
         Cliente cliente,
+        int idTipoCuenta,
         int idEstado,
+        decimal saldoInicial,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -196,4 +196,28 @@ public sealed class PagoServiciosServicio(
 
         return ResultadoOperacion<PagoServicioResultadoDto>.Ok(resultado);
     }
+
+    /// <inheritdoc />
+    public async Task<ResultadoOperacion<decimal>> ConsultarDeudaAsync(int tipoServicio, string identificador)
+    {
+        if (!Enum.IsDefined(typeof(TipoServicioPublico), tipoServicio))
+            return ResultadoOperacion<decimal>.Fallo("El tipo de servicio no es válido.");
+
+        if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
+            return ResultadoOperacion<decimal>.Fallo("El identificador no es válido.");
+
+        var tipo = (TipoServicioPublico)tipoServicio;
+        var identificadorLimpio = identificador.Trim();
+
+        var validacion = await validadorIdentificador
+            .ValidarAsync(tipo, identificadorLimpio)
+            .ConfigureAwait(false);
+        if (!validacion.EsValido)
+            return ResultadoOperacion<decimal>.Fallo(
+                validacion.Mensaje ?? "No se pudo consultar la deuda en el proveedor externo.");
+
+        var hash = Math.Abs(HashCode.Combine(tipoServicio, identificadorLimpio.ToUpperInvariant()));
+        var deuda = ((hash % 90000) + 1000) / 100m;
+        return ResultadoOperacion<decimal>.Ok(deuda);
+    }
 }

@@ -31,26 +31,48 @@ public sealed class CuentahabienteServicio(
         if (string.IsNullOrWhiteSpace(dto.Nombre) || string.IsNullOrWhiteSpace(dto.Apellido))
             return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("Nombre y apellido son obligatorios.");
 
-        if (await clientes.ExisteDpiAsync(dto.Dpi.Trim(), cancellationToken).ConfigureAwait(false))
+        if (dto.IdTipoCuenta <= 0)
+            return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("El tipo de cuenta no es válido.");
+
+        var dpi = dto.Dpi.Trim();
+        var nombre = dto.Nombre.Trim();
+        var apellido = dto.Apellido.Trim();
+        var celular = string.IsNullOrWhiteSpace(dto.Celular) ? null : dto.Celular.Trim();
+        var email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
+
+        if (await clientes.ExisteDpiAsync(dpi, cancellationToken).ConfigureAwait(false))
             return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("Ya existe un cuentahabiente con el mismo DPI.");
 
-        await clientes.RegistrarPendienteAsync(
-                dto.Dpi.Trim(),
-                dto.Nombre.Trim(),
-                dto.Apellido.Trim(),
-                string.IsNullOrWhiteSpace(dto.Celular) ? null : dto.Celular.Trim(),
-                string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim(),
+        if (!string.IsNullOrWhiteSpace(email) &&
+            await clientes.ExisteEmailAsync(email, cancellationToken).ConfigureAwait(false))
+        {
+            return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("Ya existe un cuentahabiente con el mismo email.");
+        }
+
+        var cliente = await clientes.RegistrarPendienteAsync(
+                dpi,
+                nombre,
+                apellido,
+                celular,
+                email,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var noCuenta = await numerosCuenta.GenerarSiguienteNumeroCuentaAsync(cancellationToken).ConfigureAwait(false);
+        await cuentas
+            .RegistrarCuentaPendienteAsync(
+                noCuenta,
+                cliente,
+                dto.IdTipoCuenta,
+                3,
+                0m,
                 cancellationToken)
             .ConfigureAwait(false);
 
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
 
-        var insertado = await clientes.ObtenerPorDpiAsync(dto.Dpi.Trim(), cancellationToken).ConfigureAwait(false);
-        if (insertado is null)
-            return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("No se pudo recuperar el cuentahabiente recién creado.");
-
-        var nombreCompleto = $"{insertado.Nombre} {insertado.Apellido}".Trim();
-        var resultado = new CuentahabienteCreadoDto(insertado.IdCliente, insertado.Dpi, nombreCompleto);
+        var nombreCompleto = $"{cliente.Nombre} {cliente.Apellido}".Trim();
+        var resultado = new CuentahabienteCreadoDto(cliente.IdCliente, cliente.Dpi, nombreCompleto);
         return ResultadoOperacion<CuentahabienteCreadoDto>.Ok(resultado);
     }
 
@@ -75,7 +97,13 @@ public sealed class CuentahabienteServicio(
 
         var noCuenta = await numerosCuenta.GenerarSiguienteNumeroCuentaAsync(cancellationToken).ConfigureAwait(false);
         await cuentas
-            .RegistrarCuentaPendienteAsync(noCuenta, dto.SaldoInicial, cliente, idEstadoActivo.Value, cancellationToken)
+            .RegistrarCuentaPendienteAsync(
+                noCuenta,
+                cliente,
+                1,
+                idEstadoActivo.Value,
+                dto.SaldoInicial,
+                cancellationToken)
             .ConfigureAwait(false);
 
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);

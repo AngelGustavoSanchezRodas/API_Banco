@@ -9,6 +9,7 @@ namespace API_Banco.Application.Interfaces.Repositorios;
 public interface IClienteRepositorio
 {
     Task<bool> ExisteDpiAsync(string dpi, CancellationToken cancellationToken = default);
+    Task<bool> ExisteEmailAsync(string email, CancellationToken cancellationToken = default);
 
     Task<CuentahabienteResumen?> ObtenerPorIdAsync(int idCliente, CancellationToken cancellationToken = default);
 
@@ -19,7 +20,7 @@ public interface IClienteRepositorio
     /// <summary>
     /// Registra un nuevo cliente pendiente de confirmación con <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>.
     /// </summary>
-    Task RegistrarPendienteAsync(
+    Task<Cliente> RegistrarPendienteAsync(
         string dpi,
         string nombre,
         string apellido,

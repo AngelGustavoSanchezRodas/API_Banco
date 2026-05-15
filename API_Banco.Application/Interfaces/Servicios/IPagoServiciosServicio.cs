@@ -15,4 +15,6 @@ public interface IPagoServiciosServicio
     Task<ResultadoOperacion<PagoServicioResultadoDto>> EjecutarPagoServicioAsync(
         PagoServicioDto dto,
         CancellationToken cancellationToken = default);
+
+    Task<ResultadoOperacion<decimal>> ConsultarDeudaAsync(int tipoServicio, string identificador);
 }

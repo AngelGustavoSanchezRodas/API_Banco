@@ -37,13 +37,14 @@ public class CuentaRepositorio(BancoDbContext context) : ICuentaRepositorio
             .AnyAsync(c => c.IdCuenta == idCuenta && c.IdCliente == idCliente, cancellationToken);
     }
 
-    public async Task RegistrarCuentaPendienteAsync(string noCuenta, decimal saldoInicial, Cliente cliente, int idEstado, CancellationToken cancellationToken = default)
+    public async Task RegistrarCuentaPendienteAsync(string noCuenta, Cliente cliente, int idTipoCuenta, int idEstado, decimal saldoInicial, CancellationToken cancellationToken = default)
     {
         var cuenta = new Cuenta
         {
             NoCuenta = noCuenta,
             Saldo = saldoInicial,
             Cliente = cliente,
+            IdTipoCuenta = idTipoCuenta,
             IdEstado = idEstado
         };
         await context.Cuentas.AddAsync(cuenta, cancellationToken);

@@ -82,11 +82,15 @@ public sealed class OperacionesFinancierasServicio(
         {
             cuenta.Debitar(dto.Monto);
         }
-        catch (Exception ex)
+        catch (InvalidOperationException ex)
         {
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
                 "Fondos insuficientes para el retiro.",
                 ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
         }
 
         var ahora = fecha.ObtenerUtcAhora();
@@ -122,5 +126,128 @@ public sealed class OperacionesFinancierasServicio(
 
         var dto = new ConsultaSaldoDto(idCuenta, cuenta.NoCuenta, cuenta.Saldo, fecha.ObtenerUtcAhora());
         return ResultadoOperacion<ConsultaSaldoDto>.Ok(dto);
+    }
+
+    /// <inheritdoc />
+    public async Task<ResultadoOperacion<MovimientoFinancieroResultadoDto>> ActivarCuentaConDepositoAsync(
+        int idCuenta,
+        decimal montoDeposito)
+    {
+        if (idCuenta <= 0)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no es válida.");
+
+        if (!ValidadoresEntrada.EsMontoValido(montoDeposito))
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("El monto del depósito debe ser mayor que cero.");
+
+        var cuenta = await cuentas.ObtenerEntidadPorIdAsync(idCuenta).ConfigureAwait(false);
+        if (cuenta is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
+
+        if (cuenta.IdEstado != 3)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no está pendiente de activación.");
+
+        var idTipoDeposito = await tiposTransaccion
+            .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.Deposito)
+            .ConfigureAwait(false);
+        if (idTipoDeposito is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Tipo de transacción DEPOSITO no configurado.");
+
+        cuenta.IdEstado = 1;
+        try
+        {
+            cuenta.Acreditar(montoDeposito);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
+        }
+
+        var ahora = fecha.ObtenerUtcAhora();
+        var transaccion = await transacciones
+            .CrearMovimientoPendienteAsync(idCuenta, idTipoDeposito.Value, montoDeposito, ahora)
+            .ConfigureAwait(false);
+
+        await unidadDeTrabajo.GuardarCambiosAsync().ConfigureAwait(false);
+
+        var resultado = new MovimientoFinancieroResultadoDto(
+            transaccion.IdTransaccion,
+            idCuenta,
+            montoDeposito,
+            cuenta.Saldo,
+            ahora);
+
+        return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Ok(resultado);
+    }
+
+    /// <inheritdoc />
+    public async Task<ResultadoOperacion<MovimientoFinancieroResultadoDto>> TransferirAsync(
+        int idCuentaOrigen,
+        int idCuentaDestino,
+        decimal monto,
+        string descripcion)
+    {
+        if (idCuentaOrigen <= 0 || idCuentaDestino <= 0)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Las cuentas de transferencia no son válidas.");
+
+        if (idCuentaOrigen == idCuentaDestino)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta origen y destino no pueden ser la misma.");
+
+        if (!ValidadoresEntrada.EsMontoValido(monto))
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("El monto de la transferencia debe ser mayor que cero.");
+
+        var cuentaOrigen = await cuentas.ObtenerEntidadPorIdAsync(idCuentaOrigen).ConfigureAwait(false);
+        if (cuentaOrigen is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta origen no existe.");
+
+        var cuentaDestino = await cuentas.ObtenerEntidadPorIdAsync(idCuentaDestino).ConfigureAwait(false);
+        if (cuentaDestino is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta destino no existe.");
+
+        if (cuentaOrigen.IdEstado != 1 || cuentaDestino.IdEstado != 1)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Ambas cuentas deben estar activas.");
+
+        try
+        {
+            cuentaOrigen.Debitar(monto);
+            cuentaDestino.Acreditar(monto);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
+        }
+        catch (ArgumentException ex)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
+        }
+
+        var referenciaBase = Guid.NewGuid().ToString("N");
+        var detalle = string.IsNullOrWhiteSpace(descripcion) ? "TRANSFERENCIA" : descripcion.Trim();
+        var referenciaVinculante = $"{referenciaBase}:{detalle}";
+        var ahora = fecha.ObtenerUtcAhora();
+
+        var transaccionOrigen = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaOrigen, 6, monto, ahora)
+            .ConfigureAwait(false);
+        transaccionOrigen.ReferenciaVinculante = referenciaVinculante;
+
+        var transaccionDestino = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaDestino, 7, monto, ahora)
+            .ConfigureAwait(false);
+        transaccionDestino.ReferenciaVinculante = referenciaVinculante;
+
+        await unidadDeTrabajo.GuardarCambiosAsync().ConfigureAwait(false);
+
+        var resultado = new MovimientoFinancieroResultadoDto(
+            transaccionOrigen.IdTransaccion,
+            idCuentaOrigen,
+            monto,
+            cuentaOrigen.Saldo,
+            ahora);
+
+        return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Ok(resultado);
     }
 }

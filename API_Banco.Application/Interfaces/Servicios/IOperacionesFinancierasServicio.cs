@@ -19,4 +19,14 @@ public interface IOperacionesFinancierasServicio
     Task<ResultadoOperacion<ConsultaSaldoDto>> ConsultarSaldoDisponibleAsync(
         int idCuenta,
         CancellationToken cancellationToken = default);
+
+    Task<ResultadoOperacion<MovimientoFinancieroResultadoDto>> ActivarCuentaConDepositoAsync(
+        int idCuenta,
+        decimal montoDeposito);
+
+    Task<ResultadoOperacion<MovimientoFinancieroResultadoDto>> TransferirAsync(
+        int idCuentaOrigen,
+        int idCuentaDestino,
+        decimal monto,
+        string descripcion);
 }

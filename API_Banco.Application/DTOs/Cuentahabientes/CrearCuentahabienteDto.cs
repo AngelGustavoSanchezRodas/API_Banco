@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace API_Banco.Application.DTOs.Cuentahabientes;
 
 /// <summary>
@@ -7,5 +9,6 @@ public sealed record CrearCuentahabienteDto(
     string Dpi,
     string Nombre,
     string Apellido,
-    string? Celular,
-    string? Email);
+    [property: JsonPropertyName("telefono")] string? Celular,
+    string? Email,
+    int IdTipoCuenta);
