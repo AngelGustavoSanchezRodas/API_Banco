@@ -11,6 +11,7 @@ namespace API_Banco.Domain.Entities
         public DateTime Fecha { get; set; }
         public int IdCuenta { get; set; }
         public int IdTipoTransaccion { get; set; }
+        public string? ReferenciaVinculante { get; set; }
 
         // Navegación
         public virtual Cuenta? Cuenta { get; set; }
