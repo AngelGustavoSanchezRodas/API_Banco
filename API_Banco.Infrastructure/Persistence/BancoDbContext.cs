@@ -49,13 +49,22 @@ namespace API_Banco.Infrastructure.Persistence
 
             // 2. Configuración de CUENTA BANCARIA
             modelBuilder.Entity<Cuenta>(entity => {
-                entity.ToTable("cuenta_bancaria"); //
-                entity.HasKey(e => e.IdCuenta); //
+                entity.ToTable("cuenta_bancaria");
+                entity.HasKey(e => e.IdCuenta);
                 entity.Property(e => e.IdCuenta).HasColumnName("id_cuenta");
                 entity.Property(e => e.NoCuenta).HasColumnName("no_cuenta");
                 entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
                 entity.Property(e => e.Saldo).HasColumnName("saldo_actual");
                 entity.Property(e => e.IdEstado).HasColumnName("IdEstado");
+
+                // FIX: Le decimos a EF Core qué columna es la llave foránea real
+                entity.HasOne(c => c.Cliente)
+                .WithMany()
+                .HasForeignKey(c => c.IdCliente);
+
+                entity.HasOne(c => c.Estado)
+                      .WithMany()
+                      .HasForeignKey(c => c.IdEstado);
             });
 
             // 3. Configuración de TARJETA DE DEBITO
@@ -113,7 +122,9 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.Property(e => e.IdTransaccionOrigen).HasColumnName("id_transaccion_origen");
                 entity.Property(e => e.EntidadServicio).HasColumnName("entidad_servicio");
                 entity.Property(e => e.IdentificadorServicio).HasColumnName("identificador_servicio");
-                entity.Property(e => e.MontoPagado).HasColumnName("monto_pagado");
+                entity.Property(e => e.MontoTotalPagado).HasColumnName("monto_total_pagado");
+                entity.Property(e => e.MontoEmpresa95).HasColumnName("monto_empresa_95");
+                entity.Property(e => e.ComisionBanco5).HasColumnName("comision_banco_5");
 
                 entity.HasOne(e => e.TransaccionOrigen)
                       .WithMany()

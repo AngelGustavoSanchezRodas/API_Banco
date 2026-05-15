@@ -145,7 +145,9 @@ public sealed class PagoServiciosServicio(
             TransaccionOrigen = transaccionDebito,
             EntidadServicio = dto.TipoServicio.ToString(),
             IdentificadorServicio = dto.Identificador.Trim(),
-            MontoPagado = dto.Monto
+            MontoTotalPagado = dto.Monto,
+            MontoEmpresa95 = dto.Monto * 0.95m,
+            ComisionBanco5 = dto.Monto * 0.05m
         };
 
         await registrosPago.RegistrarAsync(registroPago, cancellationToken).ConfigureAwait(false);
