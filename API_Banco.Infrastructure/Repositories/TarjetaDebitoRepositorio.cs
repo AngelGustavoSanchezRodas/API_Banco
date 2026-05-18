@@ -29,4 +29,11 @@ public class TarjetaDebitoRepositorio(BancoDbContext context) : ITarjetaDebitoRe
             .Select(t => new TarjetaDebitoCreada(t.IdTarjeta, t.NumeroTarjeta, t.IdCuenta, t.FechaVencimiento))
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<TarjetaDebito?> ObtenerPorNumeroAsync(string numeroTarjeta, CancellationToken cancellationToken = default)
+    {
+        return await context.TarjetasDebito
+            .Include(t => t.Cuenta)
+            .FirstOrDefaultAsync(t => t.NumeroTarjeta == numeroTarjeta, cancellationToken);
+    }
 }

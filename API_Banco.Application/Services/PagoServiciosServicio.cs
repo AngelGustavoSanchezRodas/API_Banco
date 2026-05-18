@@ -19,6 +19,7 @@ public sealed class PagoServiciosServicio(
     IValidadorIdentificadorServicio validadorIdentificador,
     IConsultaDeudaServicio consultaDeudaServicio,
     ICuentaRepositorio cuentas,
+    ITarjetaDebitoRepositorio tarjetas,
     ITransaccionRepositorio transacciones,
     ITipoTransaccionRepositorio tiposTransaccion,
     IRegistroPagoServicioRepositorio registrosPago,
@@ -52,8 +53,11 @@ public sealed class PagoServiciosServicio(
         PagoServicioDto dto,
         CancellationToken cancellationToken = default)
     {
-        if (dto.IdCuentaPagadora <= 0)
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La cuenta pagadora no es válida.");
+        if (string.IsNullOrWhiteSpace(dto.NumeroTarjeta))
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El número de tarjeta es obligatorio.");
+
+        if (string.IsNullOrWhiteSpace(dto.Pin))
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El PIN es obligatorio.");
 
         if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(dto.Identificador))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El identificador no es válido.");
@@ -100,13 +104,17 @@ public sealed class PagoServiciosServicio(
                 ex.Message);
         }
 
-        if (idCuentaPrestadora == dto.IdCuentaPagadora || idCuentaComisiones == dto.IdCuentaPagadora)
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                "La cuenta pagadora no puede coincidir con la cuenta prestadora o de comisiones.");
+        var tarjeta = await tarjetas.ObtenerPorNumeroAsync(dto.NumeroTarjeta.Trim(), cancellationToken).ConfigureAwait(false);
+        if (tarjeta is null || tarjeta.IdEstado != 1)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta no existe o está inactiva.");
 
-        var cuentaPagadora = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuentaPagadora, cancellationToken).ConfigureAwait(false);
-        if (cuentaPagadora is null)
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La cuenta pagadora no existe.");
+        if (!string.Equals(tarjeta.PinHash, dto.Pin.Trim(), StringComparison.Ordinal))
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("PIN incorrecto.");
+
+        if (tarjeta.Cuenta is null)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta no tiene una cuenta asociada.");
+
+        var cuentaPagadora = tarjeta.Cuenta;
 
         try
         {
@@ -115,9 +123,13 @@ public sealed class PagoServiciosServicio(
         catch (Exception ex)
         {
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                "Saldo insuficiente para ejecutar el pago.",
+                "Fondos insuficientes.",
                 ex.Message);
         }
+
+        if (idCuentaPrestadora == cuentaPagadora.IdCuenta || idCuentaComisiones == cuentaPagadora.IdCuenta)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                "La cuenta pagadora no puede coincidir con la cuenta prestadora o de comisiones.");
 
         var (montoPrestadora, comisionBanco) = DistribuidorPago95Por5.Calcular(dto.Monto);
         var ahora = fecha.ObtenerUtcAhora();
@@ -134,7 +146,7 @@ public sealed class PagoServiciosServicio(
         cuentaComisiones.Acreditar(comisionBanco);
 
         var transaccionDebito = await transacciones
-            .CrearMovimientoPendienteAsync(dto.IdCuentaPagadora, idTipoDebito.Value, dto.Monto, ahora, cancellationToken)
+            .CrearMovimientoPendienteAsync(cuentaPagadora.IdCuenta, idTipoDebito.Value, dto.Monto, ahora, cancellationToken)
             .ConfigureAwait(false);
         await transacciones
             .RegistrarMovimientoPendienteAsync(idCuentaPrestadora, idTipoPrestadora.Value, montoPrestadora, ahora, cancellationToken)
@@ -157,7 +169,7 @@ public sealed class PagoServiciosServicio(
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
 
         var idDebito = await transacciones
-            .ObtenerIdUltimaTransaccionAsync(dto.IdCuentaPagadora, ahora, dto.Monto, idTipoDebito.Value, cancellationToken)
+            .ObtenerIdUltimaTransaccionAsync(cuentaPagadora.IdCuenta, ahora, dto.Monto, idTipoDebito.Value, cancellationToken)
             .ConfigureAwait(false);
         var idPrestadora = await transacciones
             .ObtenerIdUltimaTransaccionAsync(idCuentaPrestadora, ahora, montoPrestadora, idTipoPrestadora.Value, cancellationToken)

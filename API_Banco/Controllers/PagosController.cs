@@ -26,7 +26,7 @@ namespace API_Banco.Controllers
         public async Task<IActionResult> EjecutarPago([FromBody] PagoServicioDto dto)
         {
             var resultado = await _pagoServiciosServicio.EjecutarPagoServicioAsync(dto);
-            return resultado.Exito ? Ok(resultado.Valor) : BadRequest(resultado.MensajeError);
+            return resultado.Exito ? Ok(resultado.Valor) : BadRequest(new { error = resultado.MensajeError, detalles = resultado.Detalles });
         }
 
         [HttpGet("consultar-deuda/{tipoServicio:int}/{identificador}")]

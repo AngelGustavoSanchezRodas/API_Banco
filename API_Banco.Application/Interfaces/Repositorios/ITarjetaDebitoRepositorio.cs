@@ -1,4 +1,5 @@
 using API_Banco.Application.Persistencia;
+using API_Banco.Domain.Entities;
 
 namespace API_Banco.Application.Interfaces.Repositorios;
 
@@ -22,4 +23,6 @@ public interface ITarjetaDebitoRepositorio
     /// Obtiene la tarjeta más reciente asociada a la cuenta (tras guardar cambios).
     /// </summary>
     Task<TarjetaDebitoCreada?> ObtenerUltimaPorCuentaAsync(int idCuenta, CancellationToken cancellationToken = default);
+
+    Task<TarjetaDebito?> ObtenerPorNumeroAsync(string numeroTarjeta, CancellationToken cancellationToken = default);
 }
