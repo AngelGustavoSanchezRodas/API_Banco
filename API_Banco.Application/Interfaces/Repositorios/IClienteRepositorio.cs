@@ -22,9 +22,17 @@ public interface IClienteRepositorio
     /// </summary>
     Task<Cliente> RegistrarPendienteAsync(
         string dpi,
+        string nit,
         string nombre,
         string apellido,
         string? celular,
         string? email,
+        CancellationToken cancellationToken = default);
+
+    Task RegistrarAccesoPendienteAsync(
+        Cliente cliente,
+        string correoElectronico,
+        string passwordHash,
+        string rol,
         CancellationToken cancellationToken = default);
 }

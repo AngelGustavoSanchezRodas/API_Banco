@@ -22,7 +22,7 @@ namespace API_Banco
             {
                 options.AddPolicy("NextJsPolicy", policy =>
                 {
-                    policy.WithOrigins("http://localhost:3000") // Tu frontend
+                    policy.WithOrigins()
                           .AllowAnyHeader()
                           .AllowAnyMethod();
                 });
@@ -57,8 +57,12 @@ namespace API_Banco
             builder.Services.AddScoped<IRegistroPagoServicioRepositorio, RegistroPagoServicioRepositorio>();
 
             // 6. Inyección de Servicios Externos (Mocks e Integraciones)
+            var universidadApiUrl = builder.Configuration["Integraciones:UniversidadApiUrl"];
+            if (string.IsNullOrWhiteSpace(universidadApiUrl))
+                throw new InvalidOperationException("Falta configurar Integraciones:UniversidadApiUrl.");
+
             builder.Services.AddHttpClient("UniversidadApi", client =>
-                client.BaseAddress = new Uri("https://sistemapagosuniversidad.azurewebsites.net/"));
+                client.BaseAddress = new Uri(universidadApiUrl));
             builder.Services.AddScoped<GestorIntegracionServicios>();
             builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
             builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());

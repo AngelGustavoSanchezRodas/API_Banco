@@ -17,6 +17,7 @@ namespace API_Banco.Infrastructure.Persistence
         public DbSet<TransaccionBanco> TransaccionesBanco { get; set; }
         public DbSet<RegistroPagoServicio> RegistroPagosServicios { get; set; }
         public DbSet<CuentaComision> CuentasComision { get; set; }
+        public DbSet<UsuarioAcceso> UsuariosAcceso { get; set; }
         public DbSet<Estado> Estados { get; set; }
         public DbSet<TipoTransaccion> TiposTransaccion { get; set; }
 
@@ -31,6 +32,7 @@ namespace API_Banco.Infrastructure.Persistence
 
                 entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
                 entity.Property(e => e.Dpi).HasColumnName("dpi");
+                entity.Property(e => e.Nit).HasColumnName("nit");
                 entity.Property(e => e.Nombre).HasColumnName("nombre");
                 entity.Property(e => e.Apellido).HasColumnName("apellido");
                 entity.Property(e => e.Telefono).HasColumnName("telefono");
@@ -190,6 +192,22 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.Property(e => e.IdCuentaComision).HasColumnName("id_comision_cuenta");
                 entity.Property(e => e.NombreCuenta).HasColumnName("nombre_cuenta");
                 entity.Property(e => e.SaldoAcumulado).HasColumnName("saldo_acumulado");
+            });
+
+            modelBuilder.Entity<UsuarioAcceso>(entity =>
+            {
+                entity.ToTable("usuario_acceso");
+                entity.HasKey(e => e.IdUsuario);
+
+                entity.Property(e => e.IdUsuario).HasColumnName("id_usuario");
+                entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
+                entity.Property(e => e.CorreoElectronico).HasColumnName("correo_electronico");
+                entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
+                entity.Property(e => e.Rol).HasColumnName("rol");
+
+                entity.HasOne(e => e.Cliente)
+                    .WithMany()
+                    .HasForeignKey(e => e.IdCliente);
             });
         }
     }

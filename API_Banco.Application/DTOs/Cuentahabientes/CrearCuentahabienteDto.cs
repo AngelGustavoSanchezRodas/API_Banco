@@ -7,8 +7,10 @@ namespace API_Banco.Application.DTOs.Cuentahabientes;
 /// </summary>
 public sealed record CrearCuentahabienteDto(
     string Dpi,
+    string Nit,
     string Nombre,
     string Apellido,
     [property: JsonPropertyName("telefono")] string? Celular,
     string? Email,
-    int IdTipoCuenta);
+    int IdTipoCuenta,
+    string Password);

@@ -4,6 +4,7 @@ namespace API_Banco.Domain.Entities
     {
         public int IdCliente { get; set; }
         public required string Dpi { get; set; }
+        public required string Nit { get; set; }
         public required string Nombre { get; set; }
         public required string Apellido { get; set; }
         public string? Telefono { get; set; }

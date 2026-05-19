@@ -35,10 +35,18 @@ public sealed class CuentahabienteServicio(
             return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("El tipo de cuenta no es válido.");
 
         var dpi = dto.Dpi.Trim();
+        var nit = dto.Nit.Trim();
         var nombre = dto.Nombre.Trim();
         var apellido = dto.Apellido.Trim();
         var celular = string.IsNullOrWhiteSpace(dto.Celular) ? null : dto.Celular.Trim();
         var email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
+        var password = dto.Password.Trim();
+
+        if (string.IsNullOrWhiteSpace(nit))
+            return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("El NIT es obligatorio.");
+
+        if (string.IsNullOrWhiteSpace(password))
+            return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("La contraseña es obligatoria.");
 
         if (await clientes.ExisteDpiAsync(dpi, cancellationToken).ConfigureAwait(false))
             return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("Ya existe un cuentahabiente con el mismo DPI.");
@@ -51,10 +59,19 @@ public sealed class CuentahabienteServicio(
 
         var cliente = await clientes.RegistrarPendienteAsync(
                 dpi,
+                nit,
                 nombre,
                 apellido,
                 celular,
                 email,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        await clientes.RegistrarAccesoPendienteAsync(
+                cliente,
+                email ?? string.Empty,
+                password,
+                "CLIENTE",
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -121,30 +138,23 @@ public sealed class CuentahabienteServicio(
         AsociarTarjetaDebitoDto dto,
         CancellationToken cancellationToken = default)
     {
-        if (dto.IdCliente <= 0 || dto.IdCuenta <= 0)
-            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("Cliente o cuenta no válidos.");
-
-        if (string.IsNullOrWhiteSpace(dto.Pin))
-            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("El PIN es obligatorio.");
-
-        if (dto.FechaVencimiento.Date <= DateTime.UtcNow.Date)
-            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("La fecha de vencimiento debe ser futura.");
-
-        var pertenece = await cuentas.PerteneceAClienteAsync(dto.IdCuenta, dto.IdCliente, cancellationToken).ConfigureAwait(false);
-        if (!pertenece)
-            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("La cuenta no pertenece al cuentahabiente indicado.");
+        if (dto.IdCuenta <= 0)
+            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("La cuenta no es válida.");
 
         var idEstadoTarjeta = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
         if (idEstadoTarjeta is null)
             return ResultadoOperacion<TarjetaDebitoDto>.Fallo("No está configurado el estado ACTIVO para tarjetas.");
 
+        var pin = GenerarPinTemporal();
+        var fechaVencimiento = GenerarFechaVencimiento();
+        var cvv = GenerarCvvTemporal();
         var numeroTarjeta = await numerosTarjeta.GenerarSiguienteNumeroTarjetaAsync(cancellationToken).ConfigureAwait(false);
         await tarjetas
             .RegistrarTarjetaPendienteAsync(
                 dto.IdCuenta,
                 numeroTarjeta,
-                dto.Pin.Trim(),
-                dto.FechaVencimiento,
+                pin,
+                fechaVencimiento,
                 idEstadoTarjeta.Value,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -156,11 +166,27 @@ public sealed class CuentahabienteServicio(
             return ResultadoOperacion<TarjetaDebitoDto>.Fallo("No se pudo recuperar la tarjeta recién asociada.");
 
         var salida = new TarjetaDebitoDto(
-            tarjeta.IdTarjeta,
-            FormateoTarjeta.Enmascarar(tarjeta.NumeroTarjeta),
-            tarjeta.IdCuenta,
-            tarjeta.FechaVencimiento);
+            tarjeta.NumeroTarjeta,
+            tarjeta.FechaVencimiento.Month,
+            tarjeta.FechaVencimiento.Year,
+            cvv);
 
         return ResultadoOperacion<TarjetaDebitoDto>.Ok(salida);
+    }
+
+    private static string GenerarPinTemporal()
+    {
+        return Random.Shared.Next(0, 10000).ToString("D4");
+    }
+
+    private static DateTime GenerarFechaVencimiento()
+    {
+        var ahora = DateTime.UtcNow;
+        return new DateTime(ahora.Year + 3, ahora.Month, 1).AddMonths(1).AddDays(-1);
+    }
+
+    private static string GenerarCvvTemporal()
+    {
+        return Random.Shared.Next(0, 1000).ToString("D3");
     }
 }

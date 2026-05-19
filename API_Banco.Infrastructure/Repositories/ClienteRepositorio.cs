@@ -52,11 +52,12 @@ namespace API_Banco.Infrastructure.Repositories
             return new CuentahabienteResumen(cliente.IdCliente, cliente.Dpi, cliente.Nombre, cliente.Apellido);
         }
 
-        public async Task<Cliente> RegistrarPendienteAsync(string dpi, string nombre, string apellido, string? celular, string? email, CancellationToken cancellationToken = default)
+        public async Task<Cliente> RegistrarPendienteAsync(string dpi, string nit, string nombre, string apellido, string? celular, string? email, CancellationToken cancellationToken = default)
         {
             var nuevoCliente = new Cliente
             {
                 Dpi = dpi,
+                Nit = nit,
                 Nombre = nombre,
                 Apellido = apellido,
                 Celular = celular,
@@ -65,6 +66,19 @@ namespace API_Banco.Infrastructure.Repositories
 
             await _context.Clientes.AddAsync(nuevoCliente, cancellationToken);
             return nuevoCliente;
+        }
+
+        public async Task RegistrarAccesoPendienteAsync(Cliente cliente, string correoElectronico, string passwordHash, string rol, CancellationToken cancellationToken = default)
+        {
+            var acceso = new UsuarioAcceso
+            {
+                Cliente = cliente,
+                CorreoElectronico = correoElectronico,
+                PasswordHash = passwordHash,
+                Rol = rol
+            };
+
+            await _context.UsuariosAcceso.AddAsync(acceso, cancellationToken);
         }
     }
 }
