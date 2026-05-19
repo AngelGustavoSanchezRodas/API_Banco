@@ -67,11 +67,9 @@ public sealed class CuentahabienteServicio(
                 cancellationToken)
             .ConfigureAwait(false);
 
-        var nombreUsuario = GenerarNombreUsuario(nombre, apellido);
-
         await clientes.RegistrarAccesoPendienteAsync(
                 cliente,
-                nombreUsuario,
+                dpi,
                 email ?? string.Empty,
                 password,
                 "CLIENTE",
@@ -92,7 +90,7 @@ public sealed class CuentahabienteServicio(
         await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
 
         var nombreCompleto = $"{cliente.Nombre} {cliente.Apellido}".Trim();
-        var resultado = new CuentahabienteCreadoDto(cliente.IdCliente, cliente.Dpi, nombreCompleto);
+        var resultado = new CuentahabienteCreadoDto(cliente.IdCliente, cliente.Dpi, nombreCompleto, dpi, password);
         return ResultadoOperacion<CuentahabienteCreadoDto>.Ok(resultado);
     }
 
@@ -182,11 +180,6 @@ public sealed class CuentahabienteServicio(
         return Random.Shared.Next(0, 10000).ToString("D4");
     }
 
-    private static string GenerarNombreUsuario(string nombre, string apellido)
-    {
-        var baseUsuario = $"{nombre}.{apellido}".Replace(" ", string.Empty).ToLowerInvariant();
-        return baseUsuario.Length > 50 ? baseUsuario[..50] : baseUsuario;
-    }
 
     private static DateTime GenerarFechaVencimiento()
     {
