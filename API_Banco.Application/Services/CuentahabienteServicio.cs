@@ -67,8 +67,11 @@ public sealed class CuentahabienteServicio(
                 cancellationToken)
             .ConfigureAwait(false);
 
+        var nombreUsuario = GenerarNombreUsuario(nombre, apellido);
+
         await clientes.RegistrarAccesoPendienteAsync(
                 cliente,
+                nombreUsuario,
                 email ?? string.Empty,
                 password,
                 "CLIENTE",
@@ -177,6 +180,12 @@ public sealed class CuentahabienteServicio(
     private static string GenerarPinTemporal()
     {
         return Random.Shared.Next(0, 10000).ToString("D4");
+    }
+
+    private static string GenerarNombreUsuario(string nombre, string apellido)
+    {
+        var baseUsuario = $"{nombre}.{apellido}".Replace(" ", string.Empty).ToLowerInvariant();
+        return baseUsuario.Length > 50 ? baseUsuario[..50] : baseUsuario;
     }
 
     private static DateTime GenerarFechaVencimiento()

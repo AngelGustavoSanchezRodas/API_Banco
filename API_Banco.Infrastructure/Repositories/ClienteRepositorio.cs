@@ -68,11 +68,12 @@ namespace API_Banco.Infrastructure.Repositories
             return nuevoCliente;
         }
 
-        public async Task RegistrarAccesoPendienteAsync(Cliente cliente, string correoElectronico, string passwordHash, string rol, CancellationToken cancellationToken = default)
+        public async Task RegistrarAccesoPendienteAsync(Cliente cliente, string nombreUsuario, string correoElectronico, string passwordHash, string rol, CancellationToken cancellationToken = default)
         {
             var acceso = new UsuarioAcceso
             {
                 Cliente = cliente,
+                NombreUsuario = nombreUsuario,
                 CorreoElectronico = correoElectronico,
                 PasswordHash = passwordHash,
                 Rol = rol

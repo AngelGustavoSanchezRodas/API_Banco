@@ -31,6 +31,7 @@ public interface IClienteRepositorio
 
     Task RegistrarAccesoPendienteAsync(
         Cliente cliente,
+        string nombreUsuario,
         string correoElectronico,
         string passwordHash,
         string rol,

@@ -201,6 +201,7 @@ namespace API_Banco.Infrastructure.Persistence
 
                 entity.Property(e => e.IdUsuario).HasColumnName("id_usuario");
                 entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
+                entity.Property(e => e.NombreUsuario).HasColumnName("nombre_usuario");
                 entity.Property(e => e.CorreoElectronico).HasColumnName("correo_electronico");
                 entity.Property(e => e.PasswordHash).HasColumnName("password_hash");
                 entity.Property(e => e.Rol).HasColumnName("rol");
