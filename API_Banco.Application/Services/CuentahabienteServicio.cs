@@ -168,7 +168,8 @@ public sealed class CuentahabienteServicio(
             tarjeta.NumeroTarjeta,
             tarjeta.FechaVencimiento.Month,
             tarjeta.FechaVencimiento.Year,
-            cvv);
+            cvv,
+            pin);
 
         return ResultadoOperacion<TarjetaDebitoDto>.Ok(salida);
     }
