@@ -40,13 +40,11 @@ public sealed class CuentahabienteServicio(
         var apellido = dto.Apellido.Trim();
         var celular = string.IsNullOrWhiteSpace(dto.Celular) ? null : dto.Celular.Trim();
         var email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
-        var password = dto.Password.Trim();
+        var password = GenerarPasswordTemporal(dpi);
 
         if (string.IsNullOrWhiteSpace(nit))
             return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("El NIT es obligatorio.");
 
-        if (string.IsNullOrWhiteSpace(password))
-            return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("La contraseña es obligatoria.");
 
         if (await clientes.ExisteDpiAsync(dpi, cancellationToken).ConfigureAwait(false))
             return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("Ya existe un cuentahabiente con el mismo DPI.");
@@ -190,5 +188,11 @@ public sealed class CuentahabienteServicio(
     private static string GenerarCvvTemporal()
     {
         return Random.Shared.Next(0, 1000).ToString("D3");
+    }
+
+    private static string GenerarPasswordTemporal(string dpi)
+    {
+        var prefijo = dpi.Length >= 4 ? dpi[..4] : dpi;
+        return $"Temp{prefijo}!";
     }
 }

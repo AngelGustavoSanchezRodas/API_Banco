@@ -12,5 +12,4 @@ public sealed record CrearCuentahabienteDto(
     string Apellido,
     [property: JsonPropertyName("telefono")] string? Celular,
     string? Email,
-    int IdTipoCuenta,
-    string Password);
+    int IdTipoCuenta);
