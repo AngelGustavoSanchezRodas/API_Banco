@@ -68,16 +68,46 @@ namespace API_Banco
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment()  || app.Environment.IsProduction())
             {
                 app.MapScalarApiReference();
                 app.MapOpenApi();
             }
 
+            app.Use(async (context, next) =>
+            {
+                try
+                {
+                    await next();
+                }
+                catch (Exception ex)
+                {
+                    var logger = context.RequestServices
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("UnhandledException");
+                    logger.LogError(ex, "Excepción no controlada en {Path}", context.Request.Path);
+
+                    if (!context.Response.HasStarted)
+                    {
+                        context.Response.Clear();
+                        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                        context.Response.ContentType = "application/json";
+
+                        var payload = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            error = "Excepción no controlada en el banco.",
+                            tipo = ex.GetType().FullName,
+                            mensaje = ex.Message,
+                            innerMensaje = ex.InnerException?.Message,
+                            path = context.Request.Path.Value
+                        });
+                        await context.Response.WriteAsync(payload);
+                    }
+                }
+            });
+
             app.UseHttpsRedirection();
 
-            // 6. Activar CORS (Debe ir antes del Authorization)
             app.UseCors("NextJsPolicy");
 
             app.UseAuthorization();
