@@ -58,26 +58,65 @@ namespace API_Banco
 
             // 6. Inyección de Servicios Externos (Integración HTTP)
             builder.Services.AddHttpClient();
-            builder.Services.AddScoped<GestorIntegracionServiciosHTTP>();
-            builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServiciosHTTP>());
-            builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServiciosHTTP>());
-            builder.Services.AddScoped<IConsultaDeudaServicio>(sp => sp.GetRequiredService<GestorIntegracionServiciosHTTP>());
+
+            builder.Services.AddHttpClient("UniversidadApi", client =>
+            {
+                var universidadUrl = builder.Configuration["Integraciones:UniversidadApiUrl"]
+                    ?? throw new InvalidOperationException("Falta configurar Integraciones:UniversidadApiUrl.");
+                client.BaseAddress = new Uri(universidadUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+            });
+
+            builder.Services.AddScoped<GestorIntegracionServicios>();
+            builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
+            builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
+            builder.Services.AddScoped<IConsultaDeudaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
             builder.Services.AddScoped<INumeroCuentaGenerador, GeneradoresMock>();
             builder.Services.AddScoped<INumeroTarjetaGenerador, GeneradoresMock>();
             builder.Services.AddScoped<IConfiguracionDistribucionPagos, ConfiguracionPagosMock>();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment()  || app.Environment.IsProduction())
             {
                 app.MapScalarApiReference();
                 app.MapOpenApi();
             }
 
+            app.Use(async (context, next) =>
+            {
+                try
+                {
+                    await next();
+                }
+                catch (Exception ex)
+                {
+                    var logger = context.RequestServices
+                        .GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("UnhandledException");
+                    logger.LogError(ex, "Excepción no controlada en {Path}", context.Request.Path);
+
+                    if (!context.Response.HasStarted)
+                    {
+                        context.Response.Clear();
+                        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                        context.Response.ContentType = "application/json";
+
+                        var payload = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            error = "Excepción no controlada en el banco.",
+                            tipo = ex.GetType().FullName,
+                            mensaje = ex.Message,
+                            innerMensaje = ex.InnerException?.Message,
+                            path = context.Request.Path.Value
+                        });
+                        await context.Response.WriteAsync(payload);
+                    }
+                }
+            });
+
             app.UseHttpsRedirection();
 
-            // 6. Activar CORS (Debe ir antes del Authorization)
             app.UseCors("NextJsPolicy");
 
             app.UseAuthorization();

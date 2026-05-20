@@ -66,10 +66,13 @@ public sealed class GestorIntegracionServicios(IHttpClientFactory httpClientFact
             case TipoServicioPublico.Universidad:
             {
                 var client = httpClientFactory.CreateClient("UniversidadApi");
-                var request = new UniversidadPagoRequest(notificacion.Identificador, notificacion.MontoAcreditado);
+                var request = new UniversidadPagoRequest(
+                    notificacion.Identificador,
+                    notificacion.MontoAcreditado,
+                    notificacion.ReferenciaTransaccionBanco);
 
                 using var response = await client
-                    .PostAsJsonAsync("api/Universidad/pagar", request, JsonOptions, cancellationToken)
+                    .PostAsJsonAsync("api/Universidad/pagos/confirmacion", request, JsonOptions, cancellationToken)
                     .ConfigureAwait(false);
 
                 response.EnsureSuccessStatusCode();

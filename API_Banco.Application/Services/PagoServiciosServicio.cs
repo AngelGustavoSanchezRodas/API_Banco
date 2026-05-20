@@ -104,6 +104,27 @@ public sealed class PagoServiciosServicio(
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
                 validacion.Mensaje ?? "No se pudo validar el identificador ante la empresa.");
 
+        decimal deudaPendiente;
+        try
+        {
+            deudaPendiente = await consultaDeudaServicio
+                .ConsultarDeudaAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                "No se pudo consultar la deuda pendiente del servicio.",
+                ex.Message);
+        }
+
+        if (deudaPendiente <= 0)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El servicio no tiene deuda pendiente.");
+
+        if (dto.Monto != deudaPendiente)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+
         var idTipoDebito = await tiposTransaccion
             .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.PagoServicioDebitoCuentahabiente, cancellationToken)
             .ConfigureAwait(false);
@@ -164,6 +185,7 @@ public sealed class PagoServiciosServicio(
                 "La cuenta pagadora no puede coincidir con la cuenta prestadora o de comisiones.");
 
         var (montoPrestadora, comisionBanco) = DistribuidorPago95Por5.Calcular(dto.Monto);
+        var codigoEntidadServicio = CodigosEntidadServicio.ParaRegistro(dto.TipoServicio);
         var ahora = fecha.ObtenerUtcAhora();
 
         var cuentaPrestadora = await cuentas.ObtenerEntidadPorIdAsync(idCuentaPrestadora, cancellationToken).ConfigureAwait(false);
@@ -190,11 +212,11 @@ public sealed class PagoServiciosServicio(
         var registroPago = new RegistroPagoServicio
         {
             TransaccionOrigen = transaccionDebito,
-            EntidadServicio = dto.TipoServicio.ToString(),
+            EntidadServicio = codigoEntidadServicio,
             IdentificadorServicio = dto.Identificador.Trim(),
             MontoTotalPagado = dto.Monto,
-            MontoEmpresa95 = dto.Monto * 0.95m,
-            ComisionBanco5 = dto.Monto * 0.05m
+            MontoEmpresa95 = montoPrestadora,
+            ComisionBanco5 = comisionBanco
         };
 
         await registrosPago.RegistrarAsync(registroPago, cancellationToken).ConfigureAwait(false);
@@ -215,7 +237,7 @@ public sealed class PagoServiciosServicio(
         var notificacion = new NotificacionPagoEmpresaDto(
             dto.TipoServicio,
             dto.Identificador.Trim(),
-            montoPrestadora,
+            dto.Monto,
             dto.ReferenciaCliente,
             idDebito.ToString(),
             ahora);
