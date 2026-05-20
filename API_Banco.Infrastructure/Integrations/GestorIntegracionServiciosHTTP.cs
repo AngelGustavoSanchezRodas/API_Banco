@@ -60,7 +60,7 @@ public sealed class GestorIntegracionServiciosHTTP(
             notificacion.MontoAcreditado);
 
         using var response = await client
-            .PostAsJsonAsync(BuildEnergiaUri("api/IntegracionBancaria/pago"), request, JsonOptions, cancellationToken)
+            .PostAsJsonAsync(BuildEnergiaUri("api/Energia/Banco/pagar"), request, JsonOptions, cancellationToken)
             .ConfigureAwait(false);
 
         response.EnsureSuccessStatusCode();
@@ -78,7 +78,7 @@ public sealed class GestorIntegracionServiciosHTTP(
     {
         var client = httpClientFactory.CreateClient();
         using var response = await client
-            .GetAsync(BuildEnergiaUri($"api/IntegracionBancaria/deuda/{Uri.EscapeDataString(identificador)}"), cancellationToken)
+            .GetAsync(BuildEnergiaUri($"api/Energia/Banco/consultar/{Uri.EscapeDataString(identificador)}"), cancellationToken)
             .ConfigureAwait(false);
 
         response.EnsureSuccessStatusCode();
