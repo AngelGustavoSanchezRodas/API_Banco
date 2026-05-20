@@ -2,6 +2,7 @@
 using API_Banco.Application.DTOs.Notificaciones;
 using API_Banco.Application.DTOs.Pagos;
 using API_Banco.Application.Interfaces;
+using Microsoft.Extensions.Configuration;
 
 namespace API_Banco.Infrastructure.Services;
 
@@ -37,15 +38,21 @@ public class GeneradoresMock : INumeroCuentaGenerador, INumeroTarjetaGenerador
     }
 }
 
-public class ConfiguracionPagosMock : IConfiguracionDistribucionPagos
+public class ConfiguracionPagosMock(IConfiguration configuration) : IConfiguracionDistribucionPagos
 {
     public Task<int> ObtenerIdCuentaPrestadoraAsync(TipoServicioPublico tipoServicio, CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(2); // Suponemos que la cuenta con ID 2 es la de la Empresa (Luz, UMG)
+        var clave = $"Pagos:CuentasPrestadoras:{tipoServicio}";
+        var valor = configuration.GetValue<int?>(clave)
+            ?? configuration.GetValue<int?>("Pagos:IdCuentaPrestadoraPorDefecto")
+            ?? throw new InvalidOperationException($"Falta configurar {clave} o Pagos:IdCuentaPrestadoraPorDefecto.");
+        return Task.FromResult(valor);
     }
 
     public Task<int> ObtenerIdCuentaCorrienteComisionesBancoAsync(CancellationToken cancellationToken = default)
     {
-        return Task.FromResult(1); // Suponemos que la cuenta con ID 1 es la del Banco (El 5% de comisión)
+        var valor = configuration.GetValue<int?>("Pagos:IdCuentaComisiones")
+            ?? throw new InvalidOperationException("Falta configurar Pagos:IdCuentaComisiones.");
+        return Task.FromResult(valor);
     }
 }
