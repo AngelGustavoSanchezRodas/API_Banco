@@ -22,7 +22,7 @@ namespace API_Banco
             {
                 options.AddPolicy("NextJsPolicy", policy =>
                 {
-                    policy.WithOrigins()
+                    policy.AllowAnyOrigin()
                           .AllowAnyHeader()
                           .AllowAnyMethod();
                 });
