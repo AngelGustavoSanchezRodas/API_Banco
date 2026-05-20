@@ -56,17 +56,12 @@ namespace API_Banco
             builder.Services.AddScoped<ITarjetaDebitoRepositorio, TarjetaDebitoRepositorio>();
             builder.Services.AddScoped<IRegistroPagoServicioRepositorio, RegistroPagoServicioRepositorio>();
 
-            // 6. Inyección de Servicios Externos (Mocks e Integraciones)
-            var universidadApiUrl = builder.Configuration["Integraciones:UniversidadApiUrl"];
-            if (string.IsNullOrWhiteSpace(universidadApiUrl))
-                throw new InvalidOperationException("Falta configurar Integraciones:UniversidadApiUrl.");
-
-            builder.Services.AddHttpClient("UniversidadApi", client =>
-                client.BaseAddress = new Uri(universidadApiUrl));
-            builder.Services.AddScoped<GestorIntegracionServicios>();
-            builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
-            builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
-            builder.Services.AddScoped<IConsultaDeudaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
+            // 6. Inyección de Servicios Externos (Integración HTTP)
+            builder.Services.AddHttpClient();
+            builder.Services.AddScoped<GestorIntegracionServiciosHTTP>();
+            builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServiciosHTTP>());
+            builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServiciosHTTP>());
+            builder.Services.AddScoped<IConsultaDeudaServicio>(sp => sp.GetRequiredService<GestorIntegracionServiciosHTTP>());
             builder.Services.AddScoped<INumeroCuentaGenerador, GeneradoresMock>();
             builder.Services.AddScoped<INumeroTarjetaGenerador, GeneradoresMock>();
             builder.Services.AddScoped<IConfiguracionDistribucionPagos, ConfiguracionPagosMock>();

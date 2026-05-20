@@ -36,9 +36,25 @@ public sealed class PagoServiciosServicio(
         if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(dto.Identificador))
             return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo("El identificador no es válido.");
 
-        var validacion = await validadorIdentificador
-            .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
-            .ConfigureAwait(false);
+        ResultadoValidacion validacion;
+        try
+        {
+            validacion = await validadorIdentificador
+                .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(
+                "No se pudo validar el identificador en el proveedor externo.",
+                ex.Message);
+        }
+        catch (JsonException ex)
+        {
+            return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(
+                "La respuesta del proveedor externo no tiene el formato esperado.",
+                ex.Message);
+        }
 
         var salida = new ValidacionIdentificadorResultadoDto(
             validacion.EsValido,
@@ -65,9 +81,25 @@ public sealed class PagoServiciosServicio(
         if (!ValidadoresEntrada.EsMontoValido(dto.Monto))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El monto del pago debe ser mayor que cero.");
 
-        var validacion = await validadorIdentificador
-            .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
-            .ConfigureAwait(false);
+        ResultadoValidacion validacion;
+        try
+        {
+            validacion = await validadorIdentificador
+                .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                "No se pudo validar el identificador en el proveedor externo.",
+                ex.Message);
+        }
+        catch (JsonException ex)
+        {
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                "La respuesta del proveedor externo no tiene el formato esperado.",
+                ex.Message);
+        }
         if (!validacion.EsValido)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
                 validacion.Mensaje ?? "No se pudo validar el identificador ante la empresa.");
