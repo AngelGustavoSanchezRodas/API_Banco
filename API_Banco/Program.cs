@@ -33,7 +33,7 @@ namespace API_Banco
 
             // 3. Registrar el DbContext con Pomelo MySQL
             builder.Services.AddDbContext<BancoDbContext>(options =>
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
+                options.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 32)))
             );
 
             builder.Services.AddControllers();
