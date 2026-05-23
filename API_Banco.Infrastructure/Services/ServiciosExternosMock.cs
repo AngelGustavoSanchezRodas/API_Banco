@@ -1,4 +1,4 @@
-﻿using API_Banco.Application.Common;
+using API_Banco.Application.Common;
 using API_Banco.Application.DTOs.Notificaciones;
 using API_Banco.Application.DTOs.Pagos;
 using API_Banco.Application.Interfaces;
