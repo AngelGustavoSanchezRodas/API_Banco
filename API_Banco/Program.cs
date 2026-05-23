@@ -67,6 +67,23 @@ namespace API_Banco
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
 
+            builder.Services.AddHttpClient("EnergiaApi", client =>
+            {
+                var energiaUrl = builder.Configuration["Integraciones:EnergiaApiUrl"]
+                    ?? throw new InvalidOperationException("Falta configurar Integraciones:EnergiaApiUrl.");
+                client.BaseAddress = new Uri(energiaUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+
+                // API key compartido para autenticarse contra los endpoints
+                // de IntegracionBancaria de la API de Energía. Debe coincidir
+                // con el valor "Banco:ApiKey" configurado en ApiEnergia.
+                var energiaApiKey = builder.Configuration["Integraciones:EnergiaApiKey"];
+                if (!string.IsNullOrWhiteSpace(energiaApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", energiaApiKey);
+                }
+            });
+
             builder.Services.AddScoped<GestorIntegracionServicios>();
             builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
             builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
