@@ -42,17 +42,20 @@ namespace API_Banco.Controllers
             // BaseAddress real del HttpClient nombrado, porque ahí es donde se
             // ve si Azure App Settings está sobrescribiendo el JSON.
             var universidadConfig = _configuration["Integraciones:UniversidadApiUrl"];
+            var universidadApiKey = _configuration["Integraciones:UniversidadApiKey"];
             var energiaConfig = _configuration["Integraciones:EnergiaApiUrl"];
             var energiaApiKey = _configuration["Integraciones:EnergiaApiKey"];
 
             string? universidadBase = null;
             string? energiaBase = null;
+            bool universidadTieneApiKeyEnHeader = false;
             bool energiaTieneApiKeyEnHeader = false;
 
             try
             {
                 var clienteUni = _httpClientFactory.CreateClient("UniversidadApi");
                 universidadBase = clienteUni.BaseAddress?.ToString();
+                universidadTieneApiKeyEnHeader = clienteUni.DefaultRequestHeaders.Contains("X-Api-Key");
             }
             catch
             {
@@ -76,7 +79,10 @@ namespace API_Banco.Controllers
                 universidad = new
                 {
                     urlConfigurada = universidadConfig ?? "(no configurada)",
-                    urlEnHttpClient = universidadBase ?? "(no resuelta)"
+                    urlEnHttpClient = universidadBase ?? "(no resuelta)",
+                    apiKeyPresente = !string.IsNullOrWhiteSpace(universidadApiKey),
+                    apiKeyEnHeader = universidadTieneApiKeyEnHeader,
+                    apiKeyHuella = OfuscarKey(universidadApiKey)
                 },
                 energia = new
                 {

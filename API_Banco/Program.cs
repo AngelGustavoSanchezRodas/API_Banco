@@ -65,6 +65,21 @@ namespace API_Banco
                     ?? throw new InvalidOperationException("Falta configurar Integraciones:UniversidadApiUrl.");
                 client.BaseAddress = new Uri(universidadUrl.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(30);
+
+                // API key compartido para autenticarse contra los endpoints
+                // protegidos de la API de Universidad (consultar deuda y
+                // confirmar pago). Debe coincidir con el valor "Banco:ApiKey"
+                // configurado en ApiUniversidadUMG. Si está vacío en este
+                // despliegue, no se agrega el header (compat. hacia atrás
+                // mientras Universidad todavía exponga esos endpoints como
+                // [AllowAnonymous]); en cuanto Universidad active el filtro
+                // [RequiereApiKey], la key tiene que estar presente o el
+                // banco recibirá 401 al consultar la deuda.
+                var universidadApiKey = builder.Configuration["Integraciones:UniversidadApiKey"];
+                if (!string.IsNullOrWhiteSpace(universidadApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", universidadApiKey);
+                }
             });
 
             builder.Services.AddHttpClient("EnergiaApi", client =>
