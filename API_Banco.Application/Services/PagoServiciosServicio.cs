@@ -7,6 +7,7 @@ using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services.Internos;
 using API_Banco.Domain.Entities;
+using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Text.Json;
 
@@ -26,7 +27,8 @@ public sealed class PagoServiciosServicio(
     IConfiguracionDistribucionPagos distribucion,
     INotificacionEmpresaServicio notificacionEmpresa,
     IUnidadDeTrabajo unidadDeTrabajo,
-    IProveedorFecha fecha) : IPagoServiciosServicio
+    IProveedorFecha fecha,
+    ILogger<PagoServiciosServicio> logger) : IPagoServiciosServicio
 {
     /// <inheritdoc />
     public async Task<ResultadoOperacion<ValidacionIdentificadorResultadoDto>> ValidarIdentificadorAsync(
@@ -242,14 +244,26 @@ public sealed class PagoServiciosServicio(
             idDebito.ToString(),
             ahora);
 
+        // IMPORTANTE: la notificación a la empresa (callback) NO se puede deshacer
+        // porque el débito ya está confirmado en BD. Si falla, igual respondemos
+        // al portal con éxito de cobro pero marcamos notificacionEnviada=false y
+        // dejamos rastro completo del error en Application Logs para soporte.
         var notificacionEnviada = true;
         try
         {
             await notificacionEmpresa.NotificarPagoAcreditadoAsync(notificacion, cancellationToken).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
             notificacionEnviada = false;
+            logger.LogError(
+                ex,
+                "Notificación de pago acreditado FALLÓ | tipoServicio={Tipo} identificador={Identificador} monto={Monto} referencia={Referencia}. " +
+                "El cobro al cuentahabiente ya está confirmado. Se requiere conciliación manual con la empresa prestadora.",
+                notificacion.TipoServicio,
+                notificacion.Identificador,
+                notificacion.MontoAcreditado,
+                notificacion.ReferenciaTransaccionBanco);
         }
 
         var resultado = new PagoServicioResultadoDto(
