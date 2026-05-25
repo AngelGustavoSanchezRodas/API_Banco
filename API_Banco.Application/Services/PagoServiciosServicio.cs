@@ -77,6 +77,21 @@ public sealed class PagoServiciosServicio(
         if (string.IsNullOrWhiteSpace(dto.Pin))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El PIN es obligatorio.");
 
+        // Mes/año son opcionales por compatibilidad con clientes antiguos,
+        // pero si vienen DEBEN venir ambos y con rangos sanos. Si solo uno
+        // está presente lo tratamos como entrada inválida.
+        var enviaMes = dto.MesVencimiento.HasValue;
+        var enviaAnio = dto.AnioVencimiento.HasValue;
+        if (enviaMes ^ enviaAnio)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                "Debe enviar tanto el mes como el año de vencimiento.");
+
+        if (enviaMes && dto.MesVencimiento is < 1 or > 12)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El mes de vencimiento debe estar entre 1 y 12.");
+
+        if (enviaAnio && (dto.AnioVencimiento < 2000 || dto.AnioVencimiento > 2100))
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El año de vencimiento no es válido.");
+
         if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(dto.Identificador))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El identificador no es válido.");
 
@@ -165,6 +180,27 @@ public sealed class PagoServiciosServicio(
 
         if (!string.Equals(tarjeta.PinHash, dto.Pin.Trim(), StringComparison.Ordinal))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("PIN incorrecto.");
+
+        // Si el cliente envió la fecha de vencimiento, la validamos contra los
+        // datos impresos en la tarjeta. No exponemos cuál de los dos no coincide
+        // (mes vs. año) para no dar pistas a un atacante que esté probando tarjetas.
+        if (enviaMes && enviaAnio)
+        {
+            if (tarjeta.FechaVencimiento.Month != dto.MesVencimiento ||
+                tarjeta.FechaVencimiento.Year != dto.AnioVencimiento)
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    "La fecha de vencimiento no coincide con la tarjeta.");
+
+            // La tarjeta es válida hasta el último día del mes de vencimiento.
+            var ahoraVencimiento = fecha.ObtenerUtcAhora();
+            var ultimoDiaMes = new DateTime(
+                tarjeta.FechaVencimiento.Year,
+                tarjeta.FechaVencimiento.Month,
+                DateTime.DaysInMonth(tarjeta.FechaVencimiento.Year, tarjeta.FechaVencimiento.Month),
+                23, 59, 59, DateTimeKind.Utc);
+            if (ultimoDiaMes < ahoraVencimiento)
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta está vencida.");
+        }
 
         if (tarjeta.Cuenta is null)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta no tiene una cuenta asociada.");
