@@ -1,3 +1,4 @@
+using API_Banco.Application.DTOs.Cuentahabientes;
 using API_Banco.Application.Persistencia;
 using API_Banco.Domain.Entities;
 
@@ -15,6 +16,10 @@ public interface ICuentaRepositorio
     Task<Cuenta?> ObtenerEntidadPorIdAsync(int idCuenta, CancellationToken cancellationToken = default);
 
     Task<bool> PerteneceAClienteAsync(int idCuenta, int idCliente, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<CuentaListadaDto>> ListarPorClienteAsync(
+        int idCliente,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Registra una cuenta pendiente de confirmación con <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>.

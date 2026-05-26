@@ -1,4 +1,5 @@
-﻿using API_Banco.Application.Interfaces.Repositorios;
+﻿using API_Banco.Application.DTOs.Cuentahabientes;
+using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Persistencia;
 using API_Banco.Domain.Entities;
 using API_Banco.Infrastructure.Persistence;
@@ -35,6 +36,23 @@ public class CuentaRepositorio(BancoDbContext context) : ICuentaRepositorio
     {
         return await context.Cuentas
             .AnyAsync(c => c.IdCuenta == idCuenta && c.IdCliente == idCliente, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<CuentaListadaDto>> ListarPorClienteAsync(
+        int idCliente,
+        CancellationToken cancellationToken = default)
+    {
+        return await context.Cuentas
+            .AsNoTracking()
+            .Where(c => c.IdCliente == idCliente && c.IdEstado == 1)
+            .OrderBy(c => c.IdCuenta)
+            .Select(c => new CuentaListadaDto(
+                c.IdCuenta,
+                c.NoCuenta,
+                c.Saldo,
+                c.IdTipoCuenta,
+                c.TipoCuenta != null ? c.TipoCuenta.Descripcion : null))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task RegistrarCuentaPendienteAsync(string noCuenta, Cliente cliente, int idTipoCuenta, int idEstado, decimal saldoInicial, CancellationToken cancellationToken = default)
