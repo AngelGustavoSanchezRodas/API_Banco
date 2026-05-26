@@ -35,14 +35,27 @@ public sealed class PagoServiciosServicio(
         ValidacionIdentificadorDto dto,
         CancellationToken cancellationToken = default)
     {
-        if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(dto.Identificador))
+        var identificador = dto.Identificador.Trim();
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
+            {
+                return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(
+                    "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+            }
+
+            identificador = digitos;
+        }
+        else if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
+        {
             return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo("El identificador no es válido.");
+        }
 
         ResultadoValidacion validacion;
         try
         {
             validacion = await validadorIdentificador
-                .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ValidarAsync(dto.TipoServicio, identificador, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
@@ -56,6 +69,10 @@ public sealed class PagoServiciosServicio(
             return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(
                 "La respuesta del proveedor externo no tiene el formato esperado.",
                 ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(ex.Message);
         }
 
         var salida = new ValidacionIdentificadorResultadoDto(
@@ -92,8 +109,21 @@ public sealed class PagoServiciosServicio(
         if (enviaAnio && (dto.AnioVencimiento < 2000 || dto.AnioVencimiento > 2100))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El año de vencimiento no es válido.");
 
-        if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(dto.Identificador))
+        var identificador = dto.Identificador.Trim();
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
+            {
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+            }
+
+            identificador = digitos;
+        }
+        else if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
+        {
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El identificador no es válido.");
+        }
 
         if (!ValidadoresEntrada.EsMontoValido(dto.Monto))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El monto del pago debe ser mayor que cero.");
@@ -102,7 +132,7 @@ public sealed class PagoServiciosServicio(
         try
         {
             validacion = await validadorIdentificador
-                .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ValidarAsync(dto.TipoServicio, identificador, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
@@ -117,15 +147,23 @@ public sealed class PagoServiciosServicio(
                 "La respuesta del proveedor externo no tiene el formato esperado.",
                 ex.Message);
         }
+        catch (NotSupportedException ex)
+        {
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(ex.Message);
+        }
+
         if (!validacion.EsValido)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
                 validacion.Mensaje ?? "No se pudo validar el identificador ante la empresa.");
+
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia && !string.IsNullOrWhiteSpace(validacion.ReferenciaExterna))
+            identificador = validacion.ReferenciaExterna;
 
         decimal deudaPendiente;
         try
         {
             deudaPendiente = await consultaDeudaServicio
-                .ConsultarDeudaAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ConsultarDeudaAsync(dto.TipoServicio, identificador, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -135,12 +173,27 @@ public sealed class PagoServiciosServicio(
                 ex.Message);
         }
 
-        if (deudaPendiente <= 0)
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El servicio no tiene deuda pendiente.");
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            // Postpago: la API de telefonía envía el monto de la factura; debe coincidir con la deuda consultada.
+            // Prepago (recarga): deuda 0 y monto libre enviado por el portal.
+            if (deudaPendiente > 0 && dto.Monto != deudaPendiente)
+            {
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+            }
+        }
+        else
+        {
+            if (deudaPendiente <= 0)
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El servicio no tiene deuda pendiente.");
 
-        if (dto.Monto != deudaPendiente)
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+            if (dto.Monto != deudaPendiente)
+            {
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+            }
+        }
 
         var idTipoDebito = await tiposTransaccion
             .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.PagoServicioDebitoCuentahabiente, cancellationToken)
@@ -251,7 +304,7 @@ public sealed class PagoServiciosServicio(
         {
             TransaccionOrigen = transaccionDebito,
             EntidadServicio = codigoEntidadServicio,
-            IdentificadorServicio = dto.Identificador.Trim(),
+            IdentificadorServicio = identificador,
             MontoTotalPagado = dto.Monto,
             MontoEmpresa95 = montoPrestadora,
             ComisionBanco5 = comisionBanco
@@ -274,7 +327,7 @@ public sealed class PagoServiciosServicio(
 
         var notificacion = new NotificacionPagoEmpresaDto(
             dto.TipoServicio,
-            dto.Identificador.Trim(),
+            identificador,
             dto.Monto,
             dto.ReferenciaCliente,
             idDebito.ToString(),
@@ -322,11 +375,23 @@ public sealed class PagoServiciosServicio(
         if (!Enum.IsDefined(typeof(TipoServicioPublico), tipoServicio))
             return ResultadoOperacion<decimal>.Fallo("El tipo de servicio no es válido.");
 
-        if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
-            return ResultadoOperacion<decimal>.Fallo("El identificador no es válido.");
-
         var tipo = (TipoServicioPublico)tipoServicio;
         var identificadorLimpio = identificador.Trim();
+
+        if (tipo == TipoServicioPublico.Telefonia)
+        {
+            if (!TelefoniaIdentificador.TryNormalizar(identificadorLimpio, out var digitos))
+            {
+                return ResultadoOperacion<decimal>.Fallo(
+                    "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+            }
+
+            identificadorLimpio = digitos;
+        }
+        else if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificadorLimpio))
+        {
+            return ResultadoOperacion<decimal>.Fallo("El identificador no es válido.");
+        }
 
         try
         {
@@ -346,6 +411,10 @@ public sealed class PagoServiciosServicio(
             return ResultadoOperacion<decimal>.Fallo(
                 "La respuesta del proveedor externo no tiene el formato esperado.",
                 ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ResultadoOperacion<decimal>.Fallo(ex.Message);
         }
     }
 }

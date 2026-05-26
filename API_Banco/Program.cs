@@ -99,6 +99,25 @@ namespace API_Banco
                 }
             });
 
+            var telefoniaUrl = builder.Configuration["Integraciones:TelefoniaApiUrl"]?.Trim();
+            if (!string.IsNullOrWhiteSpace(telefoniaUrl)
+                && !telefoniaUrl.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase)
+                && Uri.TryCreate(telefoniaUrl, UriKind.Absolute, out _))
+            {
+                builder.Services.AddHttpClient("TelefoniaApi", client =>
+                {
+                    client.BaseAddress = new Uri(telefoniaUrl.TrimEnd('/') + "/");
+                    client.Timeout = TimeSpan.FromSeconds(30);
+
+                    var telefoniaApiKey = builder.Configuration["Integraciones:TelefoniaApiKey"];
+                    if (!string.IsNullOrWhiteSpace(telefoniaApiKey)
+                        && !telefoniaApiKey.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase))
+                    {
+                        client.DefaultRequestHeaders.Add("X-Api-Key", telefoniaApiKey);
+                    }
+                });
+            }
+
             builder.Services.AddScoped<GestorIntegracionServicios>();
             builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
             builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());

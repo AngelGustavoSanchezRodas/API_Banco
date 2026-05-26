@@ -7,3 +7,6 @@ public record UniversidadDeudaResponse(string Carnet, decimal MontoAdicional);
 // ----- Energía Eléctrica -----
 public record EnergiaPagoRequest(string NumeroContador, decimal Monto, string? ReferenciaBanco = null);
 public record EnergiaDeudaResponse(string NumeroContador, decimal SaldoPendiente);
+
+// ----- Telefonía (callback opcional hacia la API de telefonía) -----
+public record TelefoniaPagoRequest(string NumeroTelefonico, decimal Monto, string? ReferenciaBanco = null);

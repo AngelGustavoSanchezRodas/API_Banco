@@ -4,19 +4,25 @@ using API_Banco.Application.Common;
 using API_Banco.Application.DTOs.Notificaciones;
 using API_Banco.Application.DTOs.Pagos;
 using API_Banco.Application.Interfaces;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace API_Banco.Infrastructure.Integrations;
 
 /// <summary>
-/// Adaptador HTTP único hacia las APIs externas (Universidad y Energía).
-/// Implementa los tres puertos que usa Application: validar identificador,
-/// consultar deuda y notificar pago acreditado.
+/// Adaptador HTTP hacia las APIs externas (Universidad, Energía y opcionalmente Telefonía).
+/// Telefonía usa catálogo de demostración en configuración (<c>Integraciones:TelefoniaDemoPostpago</c>)
+/// cuando no hay integración HTTP activa.
 /// </summary>
-public sealed class GestorIntegracionServicios(IHttpClientFactory httpClientFactory)
+public sealed class GestorIntegracionServicios(
+    IHttpClientFactory httpClientFactory,
+    IConfiguration configuration,
+    ILogger<GestorIntegracionServicios> logger)
     : IValidadorIdentificadorServicio, INotificacionEmpresaServicio, IConsultaDeudaServicio
 {
     private const string ClienteUniversidad = "UniversidadApi";
     private const string ClienteEnergia = "EnergiaApi";
+    private const string ClienteTelefonia = "TelefoniaApi";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -43,7 +49,16 @@ public sealed class GestorIntegracionServicios(IHttpClientFactory httpClientFact
             }
 
             case TipoServicioPublico.Telefonia:
-                throw new NotSupportedException($"La integración para {tipoServicio} aún no está implementada.");
+            {
+                if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
+                {
+                    return ResultadoValidacion.Invalido(
+                        "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+                }
+
+                return ResultadoValidacion.Valido(digitos);
+            }
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(tipoServicio), tipoServicio, "Tipo de servicio no soportado.");
         }
@@ -69,7 +84,13 @@ public sealed class GestorIntegracionServicios(IHttpClientFactory httpClientFact
             }
 
             case TipoServicioPublico.Telefonia:
-                throw new NotSupportedException($"La integración para {tipoServicio} aún no está implementada.");
+            {
+                if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
+                    return 0m;
+
+                return ObtenerDeudaTelefoniaDesdeConfiguracion(digitos);
+            }
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(tipoServicio), tipoServicio, "Tipo de servicio no soportado.");
         }
@@ -114,7 +135,34 @@ public sealed class GestorIntegracionServicios(IHttpClientFactory httpClientFact
             }
 
             case TipoServicioPublico.Telefonia:
-                throw new NotSupportedException($"La integración para {notificacion.TipoServicio} aún no está implementada.");
+            {
+                if (!TelefoniaHttpEstaConfigurado())
+                {
+                    logger.LogInformation(
+                    "Telefonía: sin URL de integración activa; el cobro quedó registrado en el banco. Tel={Tel}, monto={Monto}, refBanco={Ref}",
+                    notificacion.Identificador,
+                    notificacion.MontoAcreditado,
+                    notificacion.ReferenciaTransaccionBanco);
+                    return;
+                }
+
+                var client = httpClientFactory.CreateClient(ClienteTelefonia);
+                var request = new TelefoniaPagoRequest(
+                    notificacion.Identificador,
+                    notificacion.MontoAcreditado,
+                    notificacion.ReferenciaTransaccionBanco);
+
+                var rutaRelativa = configuration["Integraciones:TelefoniaNotificacionRutaRelativa"]?.Trim().TrimStart('/')
+                    ?? "api/IntegracionBancaria/pago";
+
+                using var response = await client
+                    .PostAsJsonAsync(rutaRelativa, request, JsonOptions, cancellationToken)
+                    .ConfigureAwait(false);
+
+                await EnsureSuccessAsync(response, "Telefonía", cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
             default:
                 throw new ArgumentOutOfRangeException(nameof(notificacion.TipoServicio), notificacion.TipoServicio, "Tipo de servicio no soportado.");
         }
@@ -162,6 +210,27 @@ public sealed class GestorIntegracionServicios(IHttpClientFactory httpClientFact
             throw new JsonException("La API de Energía devolvió una respuesta vacía.");
 
         return payload;
+    }
+
+    // ---------------- Telefonía (demostración + callback HTTP opcional) ----------------
+    private decimal ObtenerDeudaTelefoniaDesdeConfiguracion(string digitos)
+    {
+        var valorTexto = configuration[$"Integraciones:TelefoniaDemoPostpago:{digitos}"];
+        if (string.IsNullOrWhiteSpace(valorTexto))
+            return 0m;
+
+        if (!decimal.TryParse(valorTexto, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var deuda))
+            return 0m;
+
+        return deuda < 0m ? 0m : deuda;
+    }
+
+    private bool TelefoniaHttpEstaConfigurado()
+    {
+        var url = configuration["Integraciones:TelefoniaApiUrl"]?.Trim();
+        return !string.IsNullOrWhiteSpace(url)
+            && !url.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase)
+            && Uri.TryCreate(url, UriKind.Absolute, out _);
     }
 
     // ---------------- Helpers ----------------

@@ -71,6 +71,10 @@ Las cuentas internas 100-103 están enlazadas a `appsettings.Development.json �
 5. `POST api/Pagos/validar` → `tipoServicio: 1`, `identificador: "2024001001"`.
 6. `POST api/Pagos/ejecutar` → misma tarjeta/PIN, `monto: 1500.00`.
 
+## Telefonía (`tipoServicio = 2`)
+
+Ver [docs/TELEFONIA.md](../docs/TELEFONIA.md). Números postpago de demostración en `appsettings.json → Integraciones:TelefoniaDemoPostpago` (`82542114`, `55551234`).
+
 ## Notas
 
 - Los dumps solo traen **estructura**; sin `seed_banco.sql` faltan estados, tipos de transacción y cuentas 1/2.
