@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using API_Banco.Application.DTOs.Pagos;
 using API_Banco.Application.Interfaces.Servicios;
 
@@ -9,6 +10,7 @@ namespace API_Banco.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "CLIENTE")]
     public class PagosController : ControllerBase
     {
         private readonly IPagoServiciosServicio _pagoServiciosServicio;

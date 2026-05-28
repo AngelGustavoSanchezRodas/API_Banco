@@ -140,6 +140,10 @@ public sealed class CuentahabienteServicio(
         if (dto.IdCuenta <= 0)
             return ResultadoOperacion<TarjetaDebitoDto>.Fallo("La cuenta no es válida.");
 
+        var cuenta = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
+        if (cuenta is null)
+            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("La cuenta especificada no existe en el core bancario.");
+
         var idEstadoTarjeta = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
         if (idEstadoTarjeta is null)
             return ResultadoOperacion<TarjetaDebitoDto>.Fallo("No está configurado el estado ACTIVO para tarjetas.");

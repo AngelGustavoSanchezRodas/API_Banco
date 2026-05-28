@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using API_Banco.Application.DTOs.Operaciones;
 using API_Banco.Application.Interfaces.Servicios;
 
@@ -7,6 +8,7 @@ namespace API_Banco.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "CLIENTE")]
     public class OperacionesController : ControllerBase
     {
         private readonly IOperacionesFinancierasServicio _operacionesServicio;

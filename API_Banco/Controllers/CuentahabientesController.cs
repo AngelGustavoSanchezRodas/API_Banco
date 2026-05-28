@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using API_Banco.Application.DTOs.Cuentahabientes;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
@@ -7,6 +8,7 @@ namespace API_Banco.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "ADMIN")]
     public class CuentahabientesController : ControllerBase
     {
         private readonly ICuentahabienteServicio _cuentahabienteServicio;
