@@ -168,7 +168,7 @@ namespace API_Banco
 
             app.UseHttpsRedirection();
 
-            app.UseCors("NextJsPolicy");
+            app.UseCors();
 
             app.UseAuthorization();
             app.MapControllers();
