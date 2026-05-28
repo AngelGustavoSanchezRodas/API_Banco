@@ -17,7 +17,7 @@ namespace API_Banco
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // 1. Configurar CORS (Obligatorio para que Next.js no sea bloqueado)
+            // 1. Configurar CORS (Obligatorio para que Next.js o cualquier front no sea bloqueado)
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("NextJsPolicy", policy =>
@@ -39,6 +39,9 @@ namespace API_Banco
             builder.Services.AddControllers();
             builder.Services.AddOpenApi();
 
+            // [NUEVO] Registrar el servicio base de Autenticación para que [Authorize] funcione
+            builder.Services.AddAuthentication();
+
             // 4. Inyección de la Capa de Aplicación (Servicios)
             builder.Services.AddScoped<ICuentahabienteServicio, CuentahabienteServicio>();
             builder.Services.AddScoped<IOperacionesFinancierasServicio, OperacionesFinancierasServicio>();
@@ -48,7 +51,7 @@ namespace API_Banco
 
             // 5. Inyección de la Capa de Infraestructura (Repositorios)
             builder.Services.AddScoped<IUnidadDeTrabajo, UnidadDeTrabajo>();
-            builder.Services.AddScoped<IClienteRepositorio, ClienteRepositorio>(); 
+            builder.Services.AddScoped<IClienteRepositorio, ClienteRepositorio>();
             builder.Services.AddScoped<ICuentaRepositorio, CuentaRepositorio>();
             builder.Services.AddScoped<ITransaccionRepositorio, TransaccionRepositorio>();
             builder.Services.AddScoped<ITipoTransaccionRepositorio, TipoTransaccionRepositorio>();
@@ -66,15 +69,6 @@ namespace API_Banco
                 client.BaseAddress = new Uri(universidadUrl.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(30);
 
-                // API key compartido para autenticarse contra los endpoints
-                // protegidos de la API de Universidad (consultar deuda y
-                // confirmar pago). Debe coincidir con el valor "Banco:ApiKey"
-                // configurado en ApiUniversidadUMG. Si está vacío en este
-                // despliegue, no se agrega el header (compat. hacia atrás
-                // mientras Universidad todavía exponga esos endpoints como
-                // [AllowAnonymous]); en cuanto Universidad active el filtro
-                // [RequiereApiKey], la key tiene que estar presente o el
-                // banco recibirá 401 al consultar la deuda.
                 var universidadApiKey = builder.Configuration["Integraciones:UniversidadApiKey"];
                 if (!string.IsNullOrWhiteSpace(universidadApiKey))
                 {
@@ -89,9 +83,6 @@ namespace API_Banco
                 client.BaseAddress = new Uri(energiaUrl.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(30);
 
-                // API key compartido para autenticarse contra los endpoints
-                // de IntegracionBancaria de la API de Energía. Debe coincidir
-                // con el valor "Banco:ApiKey" configurado en ApiEnergia.
                 var energiaApiKey = builder.Configuration["Integraciones:EnergiaApiKey"];
                 if (!string.IsNullOrWhiteSpace(energiaApiKey))
                 {
@@ -128,7 +119,7 @@ namespace API_Banco
 
             var app = builder.Build();
 
-            if (app.Environment.IsDevelopment()  || app.Environment.IsProduction())
+            if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
             {
                 app.MapScalarApiReference();
                 app.MapOpenApi();
@@ -168,10 +159,13 @@ namespace API_Banco
 
             app.UseHttpsRedirection();
 
-            app.UseCors();
-
-            app.UseAuthorization();
-            app.MapControllers();
+ 
+            app.UseRouting();                   // 1. Sabe a dónde va la petición
+            app.UseCors("NextJsPolicy");        // 2. Deja pasar la petición (Aplica la política de arriba)
+            app.UseAuthentication();            // 3. Autenticación (Prepara para leer Tokens)
+            app.UseAuthorization();             // 4. Autorización (Aplica los [Authorize] y roles)
+            app.MapControllers();               // 5. Ejecuta el controlador
+           
 
             app.Run();
         }
