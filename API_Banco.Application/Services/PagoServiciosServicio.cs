@@ -7,6 +7,7 @@ using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services.Internos;
 using API_Banco.Domain.Entities;
+using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Text.Json;
 
@@ -26,21 +27,35 @@ public sealed class PagoServiciosServicio(
     IConfiguracionDistribucionPagos distribucion,
     INotificacionEmpresaServicio notificacionEmpresa,
     IUnidadDeTrabajo unidadDeTrabajo,
-    IProveedorFecha fecha) : IPagoServiciosServicio
+    IProveedorFecha fecha,
+    ILogger<PagoServiciosServicio> logger) : IPagoServiciosServicio
 {
     /// <inheritdoc />
     public async Task<ResultadoOperacion<ValidacionIdentificadorResultadoDto>> ValidarIdentificadorAsync(
         ValidacionIdentificadorDto dto,
         CancellationToken cancellationToken = default)
     {
-        if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(dto.Identificador))
+        var identificador = dto.Identificador.Trim();
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
+            {
+                return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(
+                    "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+            }
+
+            identificador = digitos;
+        }
+        else if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
+        {
             return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo("El identificador no es válido.");
+        }
 
         ResultadoValidacion validacion;
         try
         {
             validacion = await validadorIdentificador
-                .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ValidarAsync(dto.TipoServicio, identificador, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
@@ -54,6 +69,10 @@ public sealed class PagoServiciosServicio(
             return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(
                 "La respuesta del proveedor externo no tiene el formato esperado.",
                 ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ResultadoOperacion<ValidacionIdentificadorResultadoDto>.Fallo(ex.Message);
         }
 
         var salida = new ValidacionIdentificadorResultadoDto(
@@ -75,8 +94,36 @@ public sealed class PagoServiciosServicio(
         if (string.IsNullOrWhiteSpace(dto.Pin))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El PIN es obligatorio.");
 
-        if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(dto.Identificador))
+        // Mes/año son opcionales por compatibilidad con clientes antiguos,
+        // pero si vienen DEBEN venir ambos y con rangos sanos. Si solo uno
+        // está presente lo tratamos como entrada inválida.
+        var enviaMes = dto.MesVencimiento.HasValue;
+        var enviaAnio = dto.AnioVencimiento.HasValue;
+        if (enviaMes ^ enviaAnio)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                "Debe enviar tanto el mes como el año de vencimiento.");
+
+        if (enviaMes && dto.MesVencimiento is < 1 or > 12)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El mes de vencimiento debe estar entre 1 y 12.");
+
+        if (enviaAnio && (dto.AnioVencimiento < 2000 || dto.AnioVencimiento > 2100))
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El año de vencimiento no es válido.");
+
+        var identificador = dto.Identificador.Trim();
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
+            {
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+            }
+
+            identificador = digitos;
+        }
+        else if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
+        {
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El identificador no es válido.");
+        }
 
         if (!ValidadoresEntrada.EsMontoValido(dto.Monto))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El monto del pago debe ser mayor que cero.");
@@ -85,7 +132,7 @@ public sealed class PagoServiciosServicio(
         try
         {
             validacion = await validadorIdentificador
-                .ValidarAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ValidarAsync(dto.TipoServicio, identificador, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
@@ -100,15 +147,23 @@ public sealed class PagoServiciosServicio(
                 "La respuesta del proveedor externo no tiene el formato esperado.",
                 ex.Message);
         }
+        catch (NotSupportedException ex)
+        {
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(ex.Message);
+        }
+
         if (!validacion.EsValido)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
                 validacion.Mensaje ?? "No se pudo validar el identificador ante la empresa.");
+
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia && !string.IsNullOrWhiteSpace(validacion.ReferenciaExterna))
+            identificador = validacion.ReferenciaExterna;
 
         decimal deudaPendiente;
         try
         {
             deudaPendiente = await consultaDeudaServicio
-                .ConsultarDeudaAsync(dto.TipoServicio, dto.Identificador.Trim(), cancellationToken)
+                .ConsultarDeudaAsync(dto.TipoServicio, identificador, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
@@ -118,12 +173,27 @@ public sealed class PagoServiciosServicio(
                 ex.Message);
         }
 
-        if (deudaPendiente <= 0)
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El servicio no tiene deuda pendiente.");
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            // Postpago: la API de telefonía envía el monto de la factura; debe coincidir con la deuda consultada.
+            // Prepago (recarga): deuda 0 y monto libre enviado por el portal.
+            if (deudaPendiente > 0 && dto.Monto != deudaPendiente)
+            {
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+            }
+        }
+        else
+        {
+            if (deudaPendiente <= 0)
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("El servicio no tiene deuda pendiente.");
 
-        if (dto.Monto != deudaPendiente)
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+            if (dto.Monto != deudaPendiente)
+            {
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+            }
+        }
 
         var idTipoDebito = await tiposTransaccion
             .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.PagoServicioDebitoCuentahabiente, cancellationToken)
@@ -163,6 +233,27 @@ public sealed class PagoServiciosServicio(
 
         if (!string.Equals(tarjeta.PinHash, dto.Pin.Trim(), StringComparison.Ordinal))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("PIN incorrecto.");
+
+        // Si el cliente envió la fecha de vencimiento, la validamos contra los
+        // datos impresos en la tarjeta. No exponemos cuál de los dos no coincide
+        // (mes vs. año) para no dar pistas a un atacante que esté probando tarjetas.
+        if (enviaMes && enviaAnio)
+        {
+            if (tarjeta.FechaVencimiento.Month != dto.MesVencimiento ||
+                tarjeta.FechaVencimiento.Year != dto.AnioVencimiento)
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                    "La fecha de vencimiento no coincide con la tarjeta.");
+
+            // La tarjeta es válida hasta el último día del mes de vencimiento.
+            var ahoraVencimiento = fecha.ObtenerUtcAhora();
+            var ultimoDiaMes = new DateTime(
+                tarjeta.FechaVencimiento.Year,
+                tarjeta.FechaVencimiento.Month,
+                DateTime.DaysInMonth(tarjeta.FechaVencimiento.Year, tarjeta.FechaVencimiento.Month),
+                23, 59, 59, DateTimeKind.Utc);
+            if (ultimoDiaMes < ahoraVencimiento)
+                return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta está vencida.");
+        }
 
         if (tarjeta.Cuenta is null)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta no tiene una cuenta asociada.");
@@ -213,7 +304,7 @@ public sealed class PagoServiciosServicio(
         {
             TransaccionOrigen = transaccionDebito,
             EntidadServicio = codigoEntidadServicio,
-            IdentificadorServicio = dto.Identificador.Trim(),
+            IdentificadorServicio = identificador,
             MontoTotalPagado = dto.Monto,
             MontoEmpresa95 = montoPrestadora,
             ComisionBanco5 = comisionBanco
@@ -236,20 +327,32 @@ public sealed class PagoServiciosServicio(
 
         var notificacion = new NotificacionPagoEmpresaDto(
             dto.TipoServicio,
-            dto.Identificador.Trim(),
+            identificador,
             dto.Monto,
             dto.ReferenciaCliente,
             idDebito.ToString(),
             ahora);
 
+        // IMPORTANTE: la notificación a la empresa (callback) NO se puede deshacer
+        // porque el débito ya está confirmado en BD. Si falla, igual respondemos
+        // al portal con éxito de cobro pero marcamos notificacionEnviada=false y
+        // dejamos rastro completo del error en Application Logs para soporte.
         var notificacionEnviada = true;
         try
         {
             await notificacionEmpresa.NotificarPagoAcreditadoAsync(notificacion, cancellationToken).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
             notificacionEnviada = false;
+            logger.LogError(
+                ex,
+                "Notificación de pago acreditado FALLÓ | tipoServicio={Tipo} identificador={Identificador} monto={Monto} referencia={Referencia}. " +
+                "El cobro al cuentahabiente ya está confirmado. Se requiere conciliación manual con la empresa prestadora.",
+                notificacion.TipoServicio,
+                notificacion.Identificador,
+                notificacion.MontoAcreditado,
+                notificacion.ReferenciaTransaccionBanco);
         }
 
         var resultado = new PagoServicioResultadoDto(
@@ -272,11 +375,23 @@ public sealed class PagoServiciosServicio(
         if (!Enum.IsDefined(typeof(TipoServicioPublico), tipoServicio))
             return ResultadoOperacion<decimal>.Fallo("El tipo de servicio no es válido.");
 
-        if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
-            return ResultadoOperacion<decimal>.Fallo("El identificador no es válido.");
-
         var tipo = (TipoServicioPublico)tipoServicio;
         var identificadorLimpio = identificador.Trim();
+
+        if (tipo == TipoServicioPublico.Telefonia)
+        {
+            if (!TelefoniaIdentificador.TryNormalizar(identificadorLimpio, out var digitos))
+            {
+                return ResultadoOperacion<decimal>.Fallo(
+                    "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+            }
+
+            identificadorLimpio = digitos;
+        }
+        else if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificadorLimpio))
+        {
+            return ResultadoOperacion<decimal>.Fallo("El identificador no es válido.");
+        }
 
         try
         {
@@ -296,6 +411,10 @@ public sealed class PagoServiciosServicio(
             return ResultadoOperacion<decimal>.Fallo(
                 "La respuesta del proveedor externo no tiene el formato esperado.",
                 ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ResultadoOperacion<decimal>.Fallo(ex.Message);
         }
     }
 }

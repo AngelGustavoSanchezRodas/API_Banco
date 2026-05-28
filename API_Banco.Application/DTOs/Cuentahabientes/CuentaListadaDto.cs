@@ -1,0 +1,11 @@
+namespace API_Banco.Application.DTOs.Cuentahabientes;
+
+/// <summary>
+/// Cuenta bancaria de un cuentahabiente para listados en el panel.
+/// </summary>
+public sealed record CuentaListadaDto(
+    int IdCuenta,
+    string NoCuenta,
+    decimal Saldo,
+    int IdTipoCuenta,
+    string? DescripcionTipoCuenta);

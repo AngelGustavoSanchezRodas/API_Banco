@@ -65,7 +65,58 @@ namespace API_Banco
                     ?? throw new InvalidOperationException("Falta configurar Integraciones:UniversidadApiUrl.");
                 client.BaseAddress = new Uri(universidadUrl.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(30);
+
+                // API key compartido para autenticarse contra los endpoints
+                // protegidos de la API de Universidad (consultar deuda y
+                // confirmar pago). Debe coincidir con el valor "Banco:ApiKey"
+                // configurado en ApiUniversidadUMG. Si está vacío en este
+                // despliegue, no se agrega el header (compat. hacia atrás
+                // mientras Universidad todavía exponga esos endpoints como
+                // [AllowAnonymous]); en cuanto Universidad active el filtro
+                // [RequiereApiKey], la key tiene que estar presente o el
+                // banco recibirá 401 al consultar la deuda.
+                var universidadApiKey = builder.Configuration["Integraciones:UniversidadApiKey"];
+                if (!string.IsNullOrWhiteSpace(universidadApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", universidadApiKey);
+                }
             });
+
+            builder.Services.AddHttpClient("EnergiaApi", client =>
+            {
+                var energiaUrl = builder.Configuration["Integraciones:EnergiaApiUrl"]
+                    ?? throw new InvalidOperationException("Falta configurar Integraciones:EnergiaApiUrl.");
+                client.BaseAddress = new Uri(energiaUrl.TrimEnd('/') + "/");
+                client.Timeout = TimeSpan.FromSeconds(30);
+
+                // API key compartido para autenticarse contra los endpoints
+                // de IntegracionBancaria de la API de Energía. Debe coincidir
+                // con el valor "Banco:ApiKey" configurado en ApiEnergia.
+                var energiaApiKey = builder.Configuration["Integraciones:EnergiaApiKey"];
+                if (!string.IsNullOrWhiteSpace(energiaApiKey))
+                {
+                    client.DefaultRequestHeaders.Add("X-Api-Key", energiaApiKey);
+                }
+            });
+
+            var telefoniaUrl = builder.Configuration["Integraciones:TelefoniaApiUrl"]?.Trim();
+            if (!string.IsNullOrWhiteSpace(telefoniaUrl)
+                && !telefoniaUrl.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase)
+                && Uri.TryCreate(telefoniaUrl, UriKind.Absolute, out _))
+            {
+                builder.Services.AddHttpClient("TelefoniaApi", client =>
+                {
+                    client.BaseAddress = new Uri(telefoniaUrl.TrimEnd('/') + "/");
+                    client.Timeout = TimeSpan.FromSeconds(30);
+
+                    var telefoniaApiKey = builder.Configuration["Integraciones:TelefoniaApiKey"];
+                    if (!string.IsNullOrWhiteSpace(telefoniaApiKey)
+                        && !telefoniaApiKey.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase))
+                    {
+                        client.DefaultRequestHeaders.Add("X-Api-Key", telefoniaApiKey);
+                    }
+                });
+            }
 
             builder.Services.AddScoped<GestorIntegracionServicios>();
             builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
