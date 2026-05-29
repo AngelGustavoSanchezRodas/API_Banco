@@ -52,7 +52,10 @@ public class CuentaRepositorio(BancoDbContext context) : ICuentaRepositorio
                 c.Saldo,
                 c.IdTipoCuenta,
                 c.TipoCuenta != null ? c.TipoCuenta.Descripcion : null,
-                c.IdEstado))
+                c.IdEstado,
+                c.Tarjeta != null ? c.Tarjeta.NumeroTarjeta : null,
+                c.Tarjeta != null ? (int?)c.Tarjeta.FechaVencimiento.Month : null,
+                c.Tarjeta != null ? (int?)c.Tarjeta.FechaVencimiento.Year : null))
             .ToListAsync(cancellationToken);
     }
 

@@ -9,4 +9,7 @@ public sealed record CuentaListadaDto(
     decimal Saldo,
     int IdTipoCuenta,
     string? DescripcionTipoCuenta,
-    int IdEstado);
+    int IdEstado,
+    string? NumeroTarjeta = null,
+    int? MesVencimiento = null,
+    int? AnioVencimiento = null);
