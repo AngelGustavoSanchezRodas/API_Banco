@@ -71,6 +71,22 @@ namespace API_Banco
                         ValidAudience = builder.Configuration["Jwt:Audience"],
                         IssuerSigningKey = new SymmetricSecurityKey(keyBytes)
                     };
+
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnAuthenticationFailed = context =>
+                        {
+                            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                            logger.LogError($"[AuthError] Autenticación fallida: {context.Exception.Message}");
+                            return Task.CompletedTask;
+                        },
+                        OnChallenge = context =>
+                        {
+                            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                            logger.LogWarning($"[AuthError] Challenge lanzado: {context.ErrorDescription}");
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
             // ========================================================================
 
@@ -162,6 +178,18 @@ namespace API_Banco
                 try
                 {
                     await next();
+
+                    // Si la respuesta es 404 y no hay contenido, forzamos un JSON de error
+                    if (context.Response.StatusCode == 404 && !context.Response.HasStarted)
+                    {
+                        context.Response.ContentType = "application/json";
+                        var result = System.Text.Json.JsonSerializer.Serialize(new { 
+                            error = "Recurso no encontrado. Verifique la ruta y los parámetros.", 
+                            path = context.Request.Path,
+                            metodo = context.Request.Method
+                        });
+                        await context.Response.WriteAsync(result);
+                    }
                 }
                 catch (Exception ex)
                 {
