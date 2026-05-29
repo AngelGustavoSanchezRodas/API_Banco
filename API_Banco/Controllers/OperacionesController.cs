@@ -49,7 +49,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpPost("activar-cuenta")]
-        [Authorize(Roles = "CLIENTE")]
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> ActivarCuenta([FromBody] ActivarCuentaRequestDto dto)
         {
             var resultado = await _operacionesServicio.ActivarCuentaConDepositoAsync(dto.IdCuenta, dto.MontoDeposito);
@@ -76,7 +76,7 @@ namespace API_Banco.Controllers
     // 1. DTO para Activar Cuenta (Sin la palabra 'property:')
     public record ActivarCuentaRequestDto(
         int IdCuenta,
-        [Range(typeof(decimal), "0.01", "79228162514264337593543950335", ErrorMessage = "El monto debe ser mayor a 0.")]
+        [Range(typeof(decimal), "100.00", "79228162514264337593543950335", ErrorMessage = "El depósito de activación inicial debe ser de al menos Q100.00.")]
         decimal MontoDeposito
     );
 
