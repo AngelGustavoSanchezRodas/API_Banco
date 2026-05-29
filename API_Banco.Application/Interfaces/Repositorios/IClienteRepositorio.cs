@@ -15,6 +15,8 @@ public interface IClienteRepositorio
 
     Task<CuentahabienteResumen?> ObtenerPorDpiAsync(string dpi, CancellationToken cancellationToken = default);
 
+    Task<IEnumerable<CuentahabienteResumen>> ObtenerTodosAsync(CancellationToken cancellationToken = default);
+
     Task<Cliente?> ObtenerEntidadPorIdAsync(int idCliente, CancellationToken cancellationToken = default);
 
     /// <summary>

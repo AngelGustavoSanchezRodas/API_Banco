@@ -14,13 +14,24 @@ namespace API_Banco.Controllers
     {
         private readonly ICuentahabienteServicio _cuentahabienteServicio;
         private readonly ICuentaRepositorio _cuentaRepositorio;
+        private readonly IClienteRepositorio _clienteRepositorio;
 
         public CuentahabientesController(
             ICuentahabienteServicio cuentahabienteServicio,
-            ICuentaRepositorio cuentaRepositorio)
+            ICuentaRepositorio cuentaRepositorio,
+            IClienteRepositorio clienteRepositorio)
         {
             _cuentahabienteServicio = cuentahabienteServicio;
             _cuentaRepositorio = cuentaRepositorio;
+            _clienteRepositorio = clienteRepositorio;
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "ADMIN")] // Seguridad: Solo el administrador puede listar el padrón completo
+        public async Task<IActionResult> ObtenerTodos(CancellationToken cancellationToken)
+        {
+            var clientes = await _clienteRepositorio.ObtenerTodosAsync(cancellationToken);
+            return Ok(clientes);
         }
 
         [HttpGet("{idCliente:int}/cuentas")]

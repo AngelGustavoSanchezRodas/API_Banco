@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Persistencia;
 using API_Banco.Domain.Entities;
@@ -50,6 +50,14 @@ namespace API_Banco.Infrastructure.Repositories
             if (cliente is null) return null;
 
             return new CuentahabienteResumen(cliente.IdCliente, cliente.Dpi, cliente.Nombre, cliente.Apellido);
+        }
+
+        public async Task<IEnumerable<CuentahabienteResumen>> ObtenerTodosAsync(CancellationToken cancellationToken = default)
+        {
+            return await _context.Clientes
+                .AsNoTracking()
+                .Select(c => new CuentahabienteResumen(c.IdCliente, c.Dpi, c.Nombre, c.Apellido))
+                .ToListAsync(cancellationToken);
         }
 
         public async Task<Cliente> RegistrarPendienteAsync(string dpi, string nit, string nombre, string apellido, string? celular, string? email, CancellationToken cancellationToken = default)
