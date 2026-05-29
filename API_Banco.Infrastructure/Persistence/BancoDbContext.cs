@@ -13,7 +13,6 @@ namespace API_Banco.Infrastructure.Persistence
         public DbSet<Cuenta> Cuentas { get; set; }
         public DbSet<TipoCuenta> TiposCuenta { get; set; }
         public DbSet<TarjetaDebito> TarjetasDebito { get; set; }
-        public DbSet<TarjetaCredito> TarjetasCredito { get; set; }
         public DbSet<TransaccionBanco> TransaccionesBanco { get; set; }
         public DbSet<RegistroPagoServicio> RegistroPagosServicios { get; set; }
         public DbSet<CuentaComision> CuentasComision { get; set; }
@@ -96,31 +95,6 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.HasOne(e => e.Cuenta)
                     .WithOne(c => c.Tarjeta)
                     .HasForeignKey<TarjetaDebito>(e => e.IdCuenta);
-
-                entity.HasOne(e => e.Estado)
-                    .WithMany()
-                    .HasForeignKey(e => e.IdEstado);
-            });
-
-            modelBuilder.Entity<TarjetaCredito>(entity =>
-            {
-                entity.ToTable("tarjeta_credito");
-                entity.HasKey(e => e.IdTarjetaCredito);
-
-                entity.Property(e => e.IdTarjetaCredito).HasColumnName("id_tarjeta_credito");
-                entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
-                entity.Property(e => e.NoTarjeta).HasColumnName("no_tarjeta");
-                entity.Property(e => e.PinHash).HasColumnName("pin_hash");
-                entity.Property(e => e.LimiteCredito).HasColumnName("limite_credito");
-                entity.Property(e => e.SaldoConsumido).HasColumnName("saldo_consumido");
-                entity.Property(e => e.FechaVencimiento).HasColumnName("fecha_vencimiento");
-                entity.Property(e => e.IdEstado).HasColumnName("id_estado");
-
-                entity.HasIndex(e => e.NoTarjeta).IsUnique();
-
-                entity.HasOne(e => e.Cliente)
-                    .WithMany(c => c.TarjetasCredito)
-                    .HasForeignKey(e => e.IdCliente);
 
                 entity.HasOne(e => e.Estado)
                     .WithMany()

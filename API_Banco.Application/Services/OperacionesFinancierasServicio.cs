@@ -36,6 +36,9 @@ public sealed class OperacionesFinancierasServicio(
         if (cuenta is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
 
+        if (cuenta.IdEstado != 1)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no está activa.");
+
         cuenta.Acreditar(dto.Monto);
 
         var ahora = fecha.ObtenerUtcAhora();
@@ -78,20 +81,13 @@ public sealed class OperacionesFinancierasServicio(
         if (cuenta is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
 
-        try
-        {
-            cuenta.Debitar(dto.Monto);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
-                "Fondos insuficientes para el retiro.",
-                ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
-        }
+        if (cuenta.IdEstado != 1)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no está activa.");
+
+        if (cuenta.Saldo < dto.Monto)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Fondos insuficientes para el retiro.");
+
+        cuenta.Debitar(dto.Monto);
 
         var ahora = fecha.ObtenerUtcAhora();
         await transacciones
@@ -153,18 +149,7 @@ public sealed class OperacionesFinancierasServicio(
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Tipo de transacción DEPOSITO no configurado.");
 
         cuenta.IdEstado = 1;
-        try
-        {
-            cuenta.Acreditar(montoDeposito);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
-        }
+        cuenta.Acreditar(montoDeposito);
 
         var ahora = fecha.ObtenerUtcAhora();
         var transaccion = await transacciones
@@ -210,19 +195,11 @@ public sealed class OperacionesFinancierasServicio(
         if (cuentaOrigen.IdEstado != 1 || cuentaDestino.IdEstado != 1)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Ambas cuentas deben estar activas.");
 
-        try
-        {
-            cuentaOrigen.Debitar(monto);
-            cuentaDestino.Acreditar(monto);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
-        }
-        catch (ArgumentException ex)
-        {
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(ex.Message);
-        }
+        if (cuentaOrigen.Saldo < monto)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Saldo insuficiente.");
+
+        cuentaOrigen.Debitar(monto);
+        cuentaDestino.Acreditar(monto);
 
         var referenciaBase = Guid.NewGuid().ToString("N");
         var detalle = string.IsNullOrWhiteSpace(descripcion) ? "TRANSFERENCIA" : descripcion.Trim();

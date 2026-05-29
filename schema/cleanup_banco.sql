@@ -19,7 +19,6 @@ SET FOREIGN_KEY_CHECKS = 0;
 TRUNCATE TABLE `registro_pagos_servicios`;
 TRUNCATE TABLE `bitacora_transacciones`;
 TRUNCATE TABLE `usuario_acceso`;
-TRUNCATE TABLE `tarjeta_credito`;
 TRUNCATE TABLE `tarjeta_debito`;
 TRUNCATE TABLE `cuenta_bancaria`;
 TRUNCATE TABLE `cuenta_comision_banco`;

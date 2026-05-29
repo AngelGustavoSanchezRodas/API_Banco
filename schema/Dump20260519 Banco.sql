@@ -135,31 +135,6 @@ CREATE TABLE `registro_pagos_servicios` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `tarjeta_credito`
---
-
-DROP TABLE IF EXISTS `tarjeta_credito`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `tarjeta_credito` (
-  `id_tarjeta_credito` int NOT NULL AUTO_INCREMENT,
-  `id_cliente` int NOT NULL,
-  `no_tarjeta` varchar(16) NOT NULL,
-  `pin_hash` varchar(255) NOT NULL,
-  `limite_credito` decimal(15,2) NOT NULL,
-  `saldo_consumido` decimal(15,2) NOT NULL DEFAULT '0.00',
-  `fecha_vencimiento` date NOT NULL,
-  `id_estado` int DEFAULT '1',
-  PRIMARY KEY (`id_tarjeta_credito`),
-  UNIQUE KEY `idx_tarjetac_no` (`no_tarjeta`),
-  KEY `idx_tarjetac_cliente` (`id_cliente`),
-  KEY `idx_tarjetac_estado` (`id_estado`),
-  CONSTRAINT `fk_tarjetac_cliente` FOREIGN KEY (`id_cliente`) REFERENCES `cliente` (`id_cliente`),
-  CONSTRAINT `fk_tarjetac_estado` FOREIGN KEY (`id_estado`) REFERENCES `estado` (`id_estado`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
---
 -- Table structure for table `tarjeta_debito`
 --
 

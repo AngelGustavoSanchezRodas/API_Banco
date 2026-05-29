@@ -260,16 +260,13 @@ public sealed class PagoServiciosServicio(
 
         var cuentaPagadora = tarjeta.Cuenta;
 
-        try
-        {
-            cuentaPagadora.Debitar(dto.Monto);
-        }
-        catch (Exception ex)
-        {
-            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
-                "Fondos insuficientes.",
-                ex.Message);
-        }
+        if (cuentaPagadora.IdEstado != 1)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La cuenta no está activa.");
+
+        if (cuentaPagadora.Saldo < dto.Monto)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("Fondos insuficientes.");
+
+        cuentaPagadora.Debitar(dto.Monto);
 
         if (idCuentaPrestadora == cuentaPagadora.IdCuenta || idCuentaComisiones == cuentaPagadora.IdCuenta)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
