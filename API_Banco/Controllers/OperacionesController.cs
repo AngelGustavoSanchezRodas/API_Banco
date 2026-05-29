@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using API_Banco.Application.DTOs.Operaciones;
@@ -8,7 +8,7 @@ namespace API_Banco.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "CLIENTE")]
+    [Authorize]
     public class OperacionesController : ControllerBase
     {
         private readonly IOperacionesFinancierasServicio _operacionesServicio;
@@ -19,6 +19,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpPost("deposito")]
+        [Authorize(Roles = "CLIENTE")]
         public async Task<IActionResult> Depositar([FromBody] DepositoDto dto)
         {
             var resultado = await _operacionesServicio.DepositarAsync(dto);
@@ -28,6 +29,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpPost("retiro")]
+        [Authorize(Roles = "CLIENTE")]
         public async Task<IActionResult> Retirar([FromBody] RetiroDto dto)
         {
             var resultado = await _operacionesServicio.RetirarAsync(dto);
@@ -37,6 +39,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpGet("saldo/{idCuenta}")]
+        [Authorize(Roles = "CLIENTE")]
         public async Task<IActionResult> ConsultarSaldo(int idCuenta)
         {
             var resultado = await _operacionesServicio.ConsultarSaldoDisponibleAsync(idCuenta);
@@ -46,6 +49,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpPost("activar-cuenta")]
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> ActivarCuenta([FromBody] ActivarCuentaRequestDto dto)
         {
             var resultado = await _operacionesServicio.ActivarCuentaConDepositoAsync(dto.IdCuenta, dto.MontoDeposito);
@@ -55,6 +59,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpPost("transferir")]
+        [Authorize(Roles = "CLIENTE")]
         public async Task<IActionResult> Transferir([FromBody] TransferirRequestDto dto)
         {
             var resultado = await _operacionesServicio.TransferirAsync(
