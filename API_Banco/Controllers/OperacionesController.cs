@@ -49,7 +49,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpPost("activar-cuenta")]
-        [Authorize(Roles = "ADMIN")]
+        [Authorize(Roles = "CLIENTE")]
         public async Task<IActionResult> ActivarCuenta([FromBody] ActivarCuentaRequestDto dto)
         {
             var resultado = await _operacionesServicio.ActivarCuentaConDepositoAsync(dto.IdCuenta, dto.MontoDeposito);
