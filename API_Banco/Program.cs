@@ -8,6 +8,10 @@ using API_Banco.Infrastructure.Repositories;
 using API_Banco.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+// [NUEVO] Librerías necesarias para JWT
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace API_Banco
 {
@@ -39,8 +43,25 @@ namespace API_Banco
             builder.Services.AddControllers();
             builder.Services.AddOpenApi();
 
-            // [NUEVO] Registrar el servicio base de Autenticación para que [Authorize] funcione
-            builder.Services.AddAuthentication();
+            //Configuraion de JWT
+            var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Falta Jwt:Key en appsettings.json");
+            var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
+
+            builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(options =>
+                {
+                    options.TokenValidationParameters = new TokenValidationParameters
+                    {
+                        ValidateIssuer = true,
+                        ValidateAudience = true,
+                        ValidateLifetime = true,
+                        ValidateIssuerSigningKey = true,
+                        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+                        ValidAudience = builder.Configuration["Jwt:Audience"],
+                        IssuerSigningKey = new SymmetricSecurityKey(keyBytes)
+                    };
+                });
+            // ========================================================================
 
             // 4. Inyección de la Capa de Aplicación (Servicios)
             builder.Services.AddScoped<ICuentahabienteServicio, CuentahabienteServicio>();
@@ -159,13 +180,11 @@ namespace API_Banco
 
             app.UseHttpsRedirection();
 
- 
             app.UseRouting();                   // 1. Sabe a dónde va la petición
             app.UseCors("NextJsPolicy");        // 2. Deja pasar la petición (Aplica la política de arriba)
-            app.UseAuthentication();            // 3. Autenticación (Prepara para leer Tokens)
+            app.UseAuthentication();            // 3. Autenticación (¡Ahora valida el JWT real!)
             app.UseAuthorization();             // 4. Autorización (Aplica los [Authorize] y roles)
             app.MapControllers();               // 5. Ejecuta el controlador
-           
 
             app.Run();
         }
