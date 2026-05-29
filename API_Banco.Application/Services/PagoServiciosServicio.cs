@@ -6,6 +6,7 @@ using API_Banco.Application.Interfaces;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services.Internos;
+using Microsoft.EntityFrameworkCore;
 using API_Banco.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
@@ -308,7 +309,15 @@ public sealed class PagoServiciosServicio(
         };
 
         await registrosPago.RegistrarAsync(registroPago, cancellationToken).ConfigureAwait(false);
-        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo(
+                "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
+        }
 
         var idDebito = await transacciones
             .ObtenerIdUltimaTransaccionAsync(cuentaPagadora.IdCuenta, ahora, dto.Monto, idTipoDebito.Value, cancellationToken)

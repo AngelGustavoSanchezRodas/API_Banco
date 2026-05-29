@@ -62,6 +62,9 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.Property(e => e.IdCliente).HasColumnName("id_cliente");
                 entity.Property(e => e.IdTipoCuenta).HasColumnName("id_tipo_cuenta");
                 entity.Property(e => e.IdEstado).HasColumnName("id_estado");
+                entity.Property(e => e.VersionRow)
+                    .HasColumnName("version_row")
+                    .IsRowVersion();
 
                 entity.HasIndex(e => e.NoCuenta).IsUnique();
 

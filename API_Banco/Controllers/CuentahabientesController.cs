@@ -28,7 +28,7 @@ namespace API_Banco.Controllers
         public async Task<IActionResult> ListarCuentas(int idCliente, CancellationToken cancellationToken)
         {
             if (idCliente <= 0)
-                return BadRequest("IdCliente no válido.");
+                return BadRequest(new { mensaje = "IdCliente no válido.", error = "IdCliente no válido.", detalles = Array.Empty<string>() });
 
             
             // Leemos el rol. Soportamos tanto el mapeo de .NET como el claim directo "role"

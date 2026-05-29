@@ -5,6 +5,7 @@ using API_Banco.Application.Interfaces;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services.Internos;
+using Microsoft.EntityFrameworkCore;
 
 namespace API_Banco.Application.Services;
 
@@ -45,7 +46,15 @@ public sealed class OperacionesFinancierasServicio(
         await transacciones
             .RegistrarMovimientoPendienteAsync(dto.IdCuenta, idTipo.Value, dto.Monto, ahora, cancellationToken)
             .ConfigureAwait(false);
-        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
+                "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
+        }
 
         var idTransaccion = await transacciones
             .ObtenerIdUltimaTransaccionAsync(dto.IdCuenta, ahora, dto.Monto, idTipo.Value, cancellationToken)
@@ -93,7 +102,15 @@ public sealed class OperacionesFinancierasServicio(
         await transacciones
             .RegistrarMovimientoPendienteAsync(dto.IdCuenta, idTipo.Value, dto.Monto, ahora, cancellationToken)
             .ConfigureAwait(false);
-        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
+                "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
+        }
 
         var idTransaccion = await transacciones
             .ObtenerIdUltimaTransaccionAsync(dto.IdCuenta, ahora, dto.Monto, idTipo.Value, cancellationToken)
@@ -156,7 +173,15 @@ public sealed class OperacionesFinancierasServicio(
             .CrearMovimientoPendienteAsync(idCuenta, idTipoDeposito.Value, montoDeposito, ahora)
             .ConfigureAwait(false);
 
-        await unidadDeTrabajo.GuardarCambiosAsync().ConfigureAwait(false);
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync().ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
+                "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
+        }
 
         var resultado = new MovimientoFinancieroResultadoDto(
             transaccion.IdTransaccion,
@@ -216,7 +241,15 @@ public sealed class OperacionesFinancierasServicio(
             .ConfigureAwait(false);
         transaccionDestino.ReferenciaVinculante = referenciaVinculante;
 
-        await unidadDeTrabajo.GuardarCambiosAsync().ConfigureAwait(false);
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync().ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
+                "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
+        }
 
         var resultado = new MovimientoFinancieroResultadoDto(
             transaccionOrigen.IdTransaccion,

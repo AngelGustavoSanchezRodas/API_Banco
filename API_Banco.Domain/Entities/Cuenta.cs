@@ -10,6 +10,7 @@ namespace API_Banco.Domain.Entities
         public int IdCliente { get; set; }
         public int IdTipoCuenta { get; set; }
         public int IdEstado { get; set; } = 3;
+        public byte[]? VersionRow { get; set; }
 
         public virtual Cliente? Cliente { get; set; }
         public virtual TipoCuenta? TipoCuenta { get; set; }

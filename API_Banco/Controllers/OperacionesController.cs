@@ -22,28 +22,36 @@ namespace API_Banco.Controllers
         public async Task<IActionResult> Depositar([FromBody] DepositoDto dto)
         {
             var resultado = await _operacionesServicio.DepositarAsync(dto);
-            return resultado.Exito ? Ok(resultado.Valor) : BadRequest(resultado.MensajeError);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
 
         [HttpPost("retiro")]
         public async Task<IActionResult> Retirar([FromBody] RetiroDto dto)
         {
             var resultado = await _operacionesServicio.RetirarAsync(dto);
-            return resultado.Exito ? Ok(resultado.Valor) : BadRequest(resultado.MensajeError);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
 
         [HttpGet("saldo/{idCuenta}")]
         public async Task<IActionResult> ConsultarSaldo(int idCuenta)
         {
             var resultado = await _operacionesServicio.ConsultarSaldoDisponibleAsync(idCuenta);
-            return resultado.Exito ? Ok(resultado.Valor) : NotFound(resultado.MensajeError);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
 
         [HttpPost("activar-cuenta")]
         public async Task<IActionResult> ActivarCuenta([FromBody] ActivarCuentaRequestDto dto)
         {
             var resultado = await _operacionesServicio.ActivarCuentaConDepositoAsync(dto.IdCuenta, dto.MontoDeposito);
-            return resultado.Exito ? Ok(resultado.Valor) : BadRequest(resultado.MensajeError);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
 
         [HttpPost("transferir")]
@@ -54,7 +62,9 @@ namespace API_Banco.Controllers
                 dto.IdCuentaDestino,
                 dto.Monto,
                 dto.Descripcion);
-            return resultado.Exito ? Ok(resultado.Valor) : BadRequest(resultado.MensajeError);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
     }
 

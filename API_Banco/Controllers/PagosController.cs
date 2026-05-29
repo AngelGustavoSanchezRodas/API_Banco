@@ -25,10 +25,10 @@ namespace API_Banco.Controllers
         {
             var resultado = await _pagoServiciosServicio.ValidarIdentificadorAsync(dto);
             if (!resultado.Exito)
-                return BadRequest(RespuestaError(resultado.MensajeError));
+                return BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
 
             if (resultado.Valor is { EsValido: false } invalido)
-                return BadRequest(RespuestaError(invalido.Mensaje ?? "Identificador no válido."));
+                return BadRequest(new { mensaje = invalido.Mensaje ?? "Identificador no válido.", error = invalido.Mensaje ?? "Identificador no válido.", detalles = resultado.Detalles });
 
             return Ok(resultado.Valor);
         }
@@ -41,27 +41,16 @@ namespace API_Banco.Controllers
             var resultado = await _pagoServiciosServicio.EjecutarPagoServicioAsync(dto);
             return resultado.Exito
                 ? Ok(resultado.Valor)
-                : BadRequest(RespuestaError(resultado.MensajeError, resultado.Detalles));
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
 
         [HttpGet("consultar-deuda/{tipoServicio:int}/{identificador}")]
         public async Task<IActionResult> ConsultarDeuda(int tipoServicio, string identificador)
         {
             var resultado = await _pagoServiciosServicio.ConsultarDeudaAsync(tipoServicio, identificador);
-            return resultado.Exito ? Ok(resultado.Valor) : BadRequest(RespuestaError(resultado.MensajeError));
-        }
-
-        private static object RespuestaError(string? mensaje, IReadOnlyList<string>? detalles = null)
-        {
-            var texto = mensaje ?? "Operación rechazada.";
-            return new
-            {
-                mensaje = texto,
-                message = texto,
-                error = texto,
-                detail = texto,
-                detalles
-            };
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
     }
 }
