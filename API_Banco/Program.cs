@@ -21,16 +21,25 @@ namespace API_Banco
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // 1. Configurar CORS (Obligatorio para que Next.js o cualquier front no sea bloqueado)
+            // ========================================================================
+            // 1. CONFIGURACIÓN ESTRICTA Y DINÁMICA DE CORS
+            // ========================================================================
+            // Leemos la URL del frontend desde las variables de entorno de Azure App Service.
+            // Principio Fail-Fast: Si no está la variable, la API lanza error e impide el despliegue expuesto.
+            var frontendUrl = builder.Configuration["FrontendUrl"]
+                ?? throw new InvalidOperationException("🚨 ERROR CRÍTICO: La variable de entorno 'FrontendUrl' no está configurada.");
+
             builder.Services.AddCors(options =>
             {
-                options.AddPolicy("NextJsPolicy", policy =>
+                options.AddPolicy("ProduccionCORS", policy =>
                 {
-                    policy.AllowAnyOrigin()
+                    policy.WithOrigins(frontendUrl.TrimEnd('/')) // Acepta peticiones solo del Front oficial
                           .AllowAnyHeader()
-                          .AllowAnyMethod();
+                          .AllowAnyMethod()
+                          .AllowCredentials(); // Obligatorio si el front envía API_WITH_CREDENTIALS = true
                 });
             });
+            // ========================================================================
 
             // 2. Extraer la cadena de conexión
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -43,8 +52,10 @@ namespace API_Banco
             builder.Services.AddControllers();
             builder.Services.AddOpenApi();
 
-            //Configuraion de JWT
-            var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Falta Jwt:Key en appsettings.json");
+            // ========================================================================
+            // CONFIGURACIÓN DE JWT
+            // ========================================================================
+            var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Falta Jwt:Key en appsettings.json o en Azure Environment Variables");
             var keyBytes = Encoding.UTF8.GetBytes(jwtKey);
 
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -180,10 +191,17 @@ namespace API_Banco
 
             app.UseHttpsRedirection();
 
+            // ========================================================================
+            // MIDDLEWARE PIPELINE
+            // ========================================================================
             app.UseRouting();                   // 1. Sabe a dónde va la petición
-            app.UseCors("NextJsPolicy");        // 2. Deja pasar la petición (Aplica la política de arriba)
-            app.UseAuthentication();            // 3. Autenticación (¡Ahora valida el JWT real!)
+
+            // 2. Aplica la nueva política estricta conectada a las variables de entorno de Azure
+            app.UseCors("ProduccionCORS");
+
+            app.UseAuthentication();            // 3. Autenticación (Valida el JWT real)
             app.UseAuthorization();             // 4. Autorización (Aplica los [Authorize] y roles)
+
             app.MapControllers();               // 5. Ejecuta el controlador
 
             app.Run();
