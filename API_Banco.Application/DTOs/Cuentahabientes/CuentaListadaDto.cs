@@ -8,4 +8,5 @@ public sealed record CuentaListadaDto(
     string NoCuenta,
     decimal Saldo,
     int IdTipoCuenta,
-    string? DescripcionTipoCuenta);
+    string? DescripcionTipoCuenta,
+    int IdEstado);

@@ -1,4 +1,4 @@
-﻿using API_Banco.Application.DTOs.Cuentahabientes;
+using API_Banco.Application.DTOs.Cuentahabientes;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Persistencia;
 using API_Banco.Domain.Entities;
@@ -44,14 +44,15 @@ public class CuentaRepositorio(BancoDbContext context) : ICuentaRepositorio
     {
         return await context.Cuentas
             .AsNoTracking()
-            .Where(c => c.IdCliente == idCliente && c.IdEstado == 1)
+            .Where(c => c.IdCliente == idCliente)
             .OrderBy(c => c.IdCuenta)
             .Select(c => new CuentaListadaDto(
                 c.IdCuenta,
                 c.NoCuenta,
                 c.Saldo,
                 c.IdTipoCuenta,
-                c.TipoCuenta != null ? c.TipoCuenta.Descripcion : null))
+                c.TipoCuenta != null ? c.TipoCuenta.Descripcion : null,
+                c.IdEstado))
             .ToListAsync(cancellationToken);
     }
 
