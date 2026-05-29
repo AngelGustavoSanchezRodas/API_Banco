@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using API_Banco.Application.DTOs.Cuentahabientes;
 using API_Banco.Application.Interfaces.Repositorios;
@@ -36,8 +36,8 @@ namespace API_Banco.Controllers
 
             if (string.Equals(rol, "CLIENTE", StringComparison.OrdinalIgnoreCase))
             {
-                // Extraemos el IdCliente encriptado en el token
-                var idClienteToken = User.FindFirst("IdCliente")?.Value;
+                // Extraemos el IdCliente encriptado en el token. Buscamos en minúscula y mayúscula por precaución.
+                var idClienteToken = User.FindFirst("idCliente")?.Value ?? User.FindFirst("IdCliente")?.Value;
 
                 // Si el token no tiene IdCliente o el cliente intenta ver cuentas ajenas -> Bloqueo Inmediato (403)
                 if (string.IsNullOrEmpty(idClienteToken) || idClienteToken != idCliente.ToString())
