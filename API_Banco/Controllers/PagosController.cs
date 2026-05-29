@@ -10,7 +10,7 @@ namespace API_Banco.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles = "CLIENTE")]
+    [AllowAnonymous]
     public class PagosController : ControllerBase
     {
         private readonly IPagoServiciosServicio _pagoServiciosServicio;
@@ -20,7 +20,6 @@ namespace API_Banco.Controllers
             _pagoServiciosServicio = pagoServiciosServicio;
         }
 
-        /// <summary>Valida el identificador ante la empresa (carné, teléfono, contador).</summary>
         [HttpPost("validar")]
         public async Task<IActionResult> Validar([FromBody] ValidacionIdentificadorDto dto)
         {
@@ -34,17 +33,17 @@ namespace API_Banco.Controllers
             return Ok(resultado.Valor);
         }
 
-        /// <summary>Ejecuta cobro con tarjeta/PIN y distribución 95/5.</summary>
         [HttpPost("ejecutar")]
         public async Task<IActionResult> EjecutarPago([FromBody] PagoServicioDto dto)
         {
+            // Ejecución directa sin validación de identidad. 
+            // El Frontend y las APIs externas usan este mismo endpoint libremente.
             var resultado = await _pagoServiciosServicio.EjecutarPagoServicioAsync(dto);
             return resultado.Exito
                 ? Ok(resultado.Valor)
                 : BadRequest(RespuestaError(resultado.MensajeError, resultado.Detalles));
         }
 
-        /// <summary>Consulta deuda pendiente (postpago). Prepago telefonía devuelve 0.</summary>
         [HttpGet("consultar-deuda/{tipoServicio:int}/{identificador}")]
         public async Task<IActionResult> ConsultarDeuda(int tipoServicio, string identificador)
         {
