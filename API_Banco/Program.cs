@@ -24,19 +24,32 @@ namespace API_Banco
             // ========================================================================
             // 1. CONFIGURACIÓN ESTRICTA Y DINÁMICA DE CORS
             // ========================================================================
-            // Leemos la URL del frontend desde las variables de entorno de Azure App Service.
-            // Principio Fail-Fast: Si no está la variable, la API lanza error e impide el despliegue expuesto.
+            // Leemos la URL del frontend base
             var frontendUrl = builder.Configuration["FrontendUrl"]
                 ?? throw new InvalidOperationException("🚨 ERROR CRÍTICO: La variable de entorno 'FrontendUrl' no está configurada.");
+
+            // Extraemos las URLs de las APIs integradas desde appsettings.json
+            var universidadUrl = builder.Configuration["Integraciones:UniversidadApiUrl"];
+            var energiaUrl = builder.Configuration["Integraciones:EnergiaApiUrl"];
+            var telefoniaUrl = builder.Configuration["Integraciones:TelefoniaApiUrl"];
+
+            // Construimos la lista de orígenes permitidos de forma dinámica
+            var origenesPermitidos = new List<string> { frontendUrl.TrimEnd('/') };
+
+            if (!string.IsNullOrWhiteSpace(universidadUrl)) origenesPermitidos.Add(universidadUrl.TrimEnd('/'));
+            if (!string.IsNullOrWhiteSpace(energiaUrl)) origenesPermitidos.Add(energiaUrl.TrimEnd('/'));
+            if (!string.IsNullOrWhiteSpace(telefoniaUrl) && !telefoniaUrl.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase))
+                origenesPermitidos.Add(telefoniaUrl.TrimEnd('/'));
 
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("ProduccionCORS", policy =>
                 {
-                    policy.WithOrigins(frontendUrl.TrimEnd('/')) // Acepta peticiones solo del Front oficial
+                    // Inyectamos el arreglo completo de orígenes válidos (Front + Integraciones)
+                    policy.WithOrigins(origenesPermitidos.ToArray())
                           .AllowAnyHeader()
                           .AllowAnyMethod()
-                          .AllowCredentials(); // Obligatorio si el front envía API_WITH_CREDENTIALS = true
+                          .AllowCredentials(); // Obligatorio si alguna de las apps envía tokens/cookies
                 });
             });
             // ========================================================================
@@ -112,47 +125,47 @@ namespace API_Banco
 
             builder.Services.AddHttpClient("UniversidadApi", client =>
             {
-                var universidadUrl = builder.Configuration["Integraciones:UniversidadApiUrl"]
+                var url = builder.Configuration["Integraciones:UniversidadApiUrl"]
                     ?? throw new InvalidOperationException("Falta configurar Integraciones:UniversidadApiUrl.");
-                client.BaseAddress = new Uri(universidadUrl.TrimEnd('/') + "/");
+                client.BaseAddress = new Uri(url.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(30);
 
-                var universidadApiKey = builder.Configuration["Integraciones:UniversidadApiKey"];
-                if (!string.IsNullOrWhiteSpace(universidadApiKey))
+                var apiKey = builder.Configuration["Integraciones:UniversidadApiKey"];
+                if (!string.IsNullOrWhiteSpace(apiKey))
                 {
-                    client.DefaultRequestHeaders.Add("X-Api-Key", universidadApiKey);
+                    client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
                 }
             });
 
             builder.Services.AddHttpClient("EnergiaApi", client =>
             {
-                var energiaUrl = builder.Configuration["Integraciones:EnergiaApiUrl"]
+                var url = builder.Configuration["Integraciones:EnergiaApiUrl"]
                     ?? throw new InvalidOperationException("Falta configurar Integraciones:EnergiaApiUrl.");
-                client.BaseAddress = new Uri(energiaUrl.TrimEnd('/') + "/");
+                client.BaseAddress = new Uri(url.TrimEnd('/') + "/");
                 client.Timeout = TimeSpan.FromSeconds(30);
 
-                var energiaApiKey = builder.Configuration["Integraciones:EnergiaApiKey"];
-                if (!string.IsNullOrWhiteSpace(energiaApiKey))
+                var apiKey = builder.Configuration["Integraciones:EnergiaApiKey"];
+                if (!string.IsNullOrWhiteSpace(apiKey))
                 {
-                    client.DefaultRequestHeaders.Add("X-Api-Key", energiaApiKey);
+                    client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
                 }
             });
 
-            var telefoniaUrl = builder.Configuration["Integraciones:TelefoniaApiUrl"]?.Trim();
-            if (!string.IsNullOrWhiteSpace(telefoniaUrl)
-                && !telefoniaUrl.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase)
-                && Uri.TryCreate(telefoniaUrl, UriKind.Absolute, out _))
+            var telUrlOriginal = builder.Configuration["Integraciones:TelefoniaApiUrl"]?.Trim();
+            if (!string.IsNullOrWhiteSpace(telUrlOriginal)
+                && !telUrlOriginal.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase)
+                && Uri.TryCreate(telUrlOriginal, UriKind.Absolute, out _))
             {
                 builder.Services.AddHttpClient("TelefoniaApi", client =>
                 {
-                    client.BaseAddress = new Uri(telefoniaUrl.TrimEnd('/') + "/");
+                    client.BaseAddress = new Uri(telUrlOriginal.TrimEnd('/') + "/");
                     client.Timeout = TimeSpan.FromSeconds(30);
 
-                    var telefoniaApiKey = builder.Configuration["Integraciones:TelefoniaApiKey"];
-                    if (!string.IsNullOrWhiteSpace(telefoniaApiKey)
-                        && !telefoniaApiKey.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase))
+                    var apiKey = builder.Configuration["Integraciones:TelefoniaApiKey"];
+                    if (!string.IsNullOrWhiteSpace(apiKey)
+                        && !apiKey.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase))
                     {
-                        client.DefaultRequestHeaders.Add("X-Api-Key", telefoniaApiKey);
+                        client.DefaultRequestHeaders.Add("X-Api-Key", apiKey);
                     }
                 });
             }
@@ -183,8 +196,9 @@ namespace API_Banco
                     if (context.Response.StatusCode == 404 && !context.Response.HasStarted)
                     {
                         context.Response.ContentType = "application/json";
-                        var result = System.Text.Json.JsonSerializer.Serialize(new { 
-                            error = "Recurso no encontrado. Verifique la ruta y los parámetros.", 
+                        var result = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            error = "Recurso no encontrado. Verifique la ruta y los parámetros.",
                             path = context.Request.Path,
                             metodo = context.Request.Method
                         });
@@ -219,9 +233,7 @@ namespace API_Banco
 
             app.UseHttpsRedirection();
 
-            // ========================================================================
             // MIDDLEWARE PIPELINE
-            // ========================================================================
             app.UseRouting();                   // 1. Sabe a dónde va la petición
 
             // 2. Aplica la nueva política estricta conectada a las variables de entorno de Azure
