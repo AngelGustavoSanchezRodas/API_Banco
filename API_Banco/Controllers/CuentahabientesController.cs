@@ -34,6 +34,19 @@ namespace API_Banco.Controllers
             return Ok(clientes);
         }
 
+        /// <summary>
+        /// Lista las cuentas internas operacionales del banco (comisiones y cuentas
+        /// de recaudación de prestadoras de servicios). No son cuentahabientes; se
+        /// muestran como saldos del banco.
+        /// </summary>
+        [HttpGet("cuentas-internas")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> ListarCuentasInternas(CancellationToken cancellationToken)
+        {
+            var cuentas = await _cuentaRepositorio.ListarCuentasInternasAsync(cancellationToken);
+            return Ok(cuentas);
+        }
+
         [HttpGet("{idCliente:int}/cuentas")]
         [Authorize(Roles = "ADMIN,CLIENTE")] // [SEGURIDAD] Permitimos a ambos roles entrar al flujo
         public async Task<IActionResult> ListarCuentas(int idCliente, CancellationToken cancellationToken)

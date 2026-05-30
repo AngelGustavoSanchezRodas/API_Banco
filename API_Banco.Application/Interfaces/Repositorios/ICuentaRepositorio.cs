@@ -1,3 +1,4 @@
+using API_Banco.Application.Constants;
 using API_Banco.Application.DTOs.Cuentahabientes;
 using API_Banco.Application.Persistencia;
 using API_Banco.Domain.Entities;
@@ -20,6 +21,21 @@ public interface ICuentaRepositorio
     Task<IReadOnlyList<CuentaListadaDto>> ListarPorClienteAsync(
         int idCliente,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lista las cuentas internas operacionales del banco
+    /// (tipo <see cref="CodigosTipoCuenta.CuentaInternaBanco"/>): comisiones y
+    /// cuentas de recaudación de prestadoras de servicios.
+    /// </summary>
+    Task<IReadOnlyList<CuentaInternaDto>> ListarCuentasInternasAsync(
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Indica si la cuenta corresponde al tipo <see cref="CodigosTipoCuenta.CuentaInternaBanco"/>.
+    /// Útil para defensa en profundidad antes de aplicar operaciones administrativas
+    /// (suspensión/reactivación, emisión de tarjeta, etc.) que no aplican a cuentas internas.
+    /// </summary>
+    Task<bool> EsCuentaInternaAsync(int idCuenta, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Registra una cuenta pendiente de confirmación con <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>.

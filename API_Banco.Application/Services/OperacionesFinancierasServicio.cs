@@ -309,6 +309,9 @@ public sealed class OperacionesFinancierasServicio(
         if (cuenta is null)
             return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("La cuenta no existe.");
 
+        if (await cuentas.EsCuentaInternaAsync(idCuenta, cancellationToken).ConfigureAwait(false))
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Las cuentas internas del banco no pueden ser suspendidas.");
+
         if (cuenta.IdEstado != idEstadoActivo.Value)
             return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Sólo se puede suspender una cuenta que está ACTIVA.");
 
@@ -359,6 +362,9 @@ public sealed class OperacionesFinancierasServicio(
         var cuenta = await cuentas.ObtenerEntidadPorIdAsync(idCuenta, cancellationToken).ConfigureAwait(false);
         if (cuenta is null)
             return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("La cuenta no existe.");
+
+        if (await cuentas.EsCuentaInternaAsync(idCuenta, cancellationToken).ConfigureAwait(false))
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Las cuentas internas del banco no pueden cambiar de estado.");
 
         if (cuenta.IdEstado != idEstadoInactivo.Value)
             return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Sólo se puede reactivar una cuenta que está INACTIVA.");

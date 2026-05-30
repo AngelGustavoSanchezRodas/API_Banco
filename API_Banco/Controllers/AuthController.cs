@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using API_Banco.Application.Interfaces;
@@ -95,9 +96,65 @@ namespace API_Banco.Controllers
 
             return Ok(respuesta);
         }
+
+        /// <summary>
+        /// Cambia la contraseña del usuario autenticado. Requiere conocer la contraseña actual.
+        /// Disponible para CLIENTE y ADMIN.
+        /// </summary>
+        [HttpPost("cambiar-password")]
+        [Authorize]
+        public async Task<IActionResult> CambiarPassword(
+            [FromBody] CambiarPasswordRequest request,
+            CancellationToken cancellationToken)
+        {
+            if (request is null)
+                return BadRequest(new { error = "Petición vacía." });
+
+            if (string.IsNullOrWhiteSpace(request.PasswordActual) ||
+                string.IsNullOrWhiteSpace(request.PasswordNueva))
+            {
+                return BadRequest(new { error = "Debes ingresar la contraseña actual y la nueva." });
+            }
+
+            if (request.PasswordNueva.Length < 8)
+                return BadRequest(new { error = "La nueva contraseña debe tener al menos 8 caracteres." });
+
+            if (string.Equals(request.PasswordActual, request.PasswordNueva, StringComparison.Ordinal))
+                return BadRequest(new { error = "La nueva contraseña debe ser distinta a la actual." });
+
+            var idUsuarioClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                                  ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!int.TryParse(idUsuarioClaim, out var idUsuario))
+                return Unauthorized();
+
+            var usuario = await _context.UsuariosAcceso
+                .FirstOrDefaultAsync(u => u.IdUsuario == idUsuario, cancellationToken);
+            if (usuario is null)
+                return Unauthorized();
+
+            if (!_hasher.Verificar(request.PasswordActual, usuario.PasswordHash))
+                return BadRequest(new { error = "La contraseña actual no es correcta." });
+
+            usuario.PasswordHash = _hasher.Hashear(request.PasswordNueva);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException ex)
+            {
+                _logger.LogError(ex,
+                    "Error guardando la nueva contraseña del usuario {IdUsuario}.",
+                    usuario.IdUsuario);
+                return StatusCode(500, new { error = "No se pudo guardar la nueva contraseña." });
+            }
+
+            return Ok(new { mensaje = "Contraseña actualizada correctamente." });
+        }
     }
 
     public sealed record LoginRequest(string Credencial, string Password);
+
+    public sealed record CambiarPasswordRequest(string PasswordActual, string PasswordNueva);
 
     // Nota: 'Rol' y 'IdCliente' deben coincidir con la desestructuración en el React.
     //       IdCliente es null para usuarios ADMIN (no están atados a un cuentahabiente).

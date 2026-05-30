@@ -71,6 +71,38 @@ public class CuentaRepositorio(BancoDbContext context) : ICuentaRepositorio
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<CuentaInternaDto>> ListarCuentasInternasAsync(
+        CancellationToken cancellationToken = default)
+    {
+        // Las cuentas internas del banco se identifican por su tipo
+        // (CUENTA_INTERNA_BANCO). Esto es más robusto que filtrar por id_cliente,
+        // porque el código sólo depende del catálogo, no del seed concreto.
+        return await context.Cuentas
+            .AsNoTracking()
+            .Where(c => c.TipoCuenta != null &&
+                        c.TipoCuenta.Descripcion == CodigosTipoCuenta.CuentaInternaBanco)
+            .OrderBy(c => c.IdCuenta)
+            .Select(c => new CuentaInternaDto(
+                c.IdCuenta,
+                c.NoCuenta,
+                c.Saldo,
+                c.IdTipoCuenta,
+                c.TipoCuenta != null ? c.TipoCuenta.Descripcion : null,
+                c.IdEstado,
+                c.Estado != null ? c.Estado.Descripcion : null))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<bool> EsCuentaInternaAsync(int idCuenta, CancellationToken cancellationToken = default)
+    {
+        return await context.Cuentas
+            .AsNoTracking()
+            .AnyAsync(c => c.IdCuenta == idCuenta &&
+                           c.TipoCuenta != null &&
+                           c.TipoCuenta.Descripcion == CodigosTipoCuenta.CuentaInternaBanco,
+                cancellationToken);
+    }
+
     public async Task RegistrarCuentaPendienteAsync(string noCuenta, Cliente cliente, int idTipoCuenta, int idEstado, decimal saldoInicial, CancellationToken cancellationToken = default)
     {
         var cuenta = new Cuenta

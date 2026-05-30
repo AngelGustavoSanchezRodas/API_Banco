@@ -112,6 +112,10 @@ public sealed class CuentahabienteServicio(
         if (cliente is null)
             return ResultadoOperacion<CuentaAbiertaDto>.Fallo("No se encontró el cuentahabiente.");
 
+        // Defensa en profundidad: nunca abrir cuentas a nombre del cliente sistema.
+        if (string.Equals(cliente.Dpi, CodigosClienteSistema.Dpi, StringComparison.Ordinal))
+            return ResultadoOperacion<CuentaAbiertaDto>.Fallo("No se permiten operaciones de cliente sobre el cliente sistema.");
+
         var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
         if (idEstadoActivo is null)
             return ResultadoOperacion<CuentaAbiertaDto>.Fallo("No está configurado el estado ACTIVO para cuentas.");
@@ -148,6 +152,11 @@ public sealed class CuentahabienteServicio(
         var cuenta = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
         if (cuenta is null)
             return ResultadoOperacion<TarjetaDebitoDto>.Fallo("La cuenta especificada no existe en el core bancario.");
+
+        // Defensa en profundidad: las cuentas internas del banco no admiten tarjetas
+        // de débito. Comparamos por tipo de cuenta (CUENTA_INTERNA_BANCO).
+        if (await cuentas.EsCuentaInternaAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false))
+            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("No se emiten tarjetas de débito sobre cuentas internas del banco.");
 
         var idEstadoTarjeta = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
         if (idEstadoTarjeta is null)
@@ -207,6 +216,9 @@ public sealed class CuentahabienteServicio(
         var cliente = await clientes.ObtenerEntidadPorIdAsync(idCliente, cancellationToken).ConfigureAwait(false);
         if (cliente is null)
             return ResultadoOperacion<PasswordReseteadaDto>.Fallo("No se encontró el cuentahabiente.");
+
+        if (string.Equals(cliente.Dpi, CodigosClienteSistema.Dpi, StringComparison.Ordinal))
+            return ResultadoOperacion<PasswordReseteadaDto>.Fallo("No se permiten operaciones de cliente sobre el cliente sistema.");
 
         var acceso = await clientes.ObtenerAccesoPorIdClienteAsync(idCliente, cancellationToken).ConfigureAwait(false);
         if (acceso is null)

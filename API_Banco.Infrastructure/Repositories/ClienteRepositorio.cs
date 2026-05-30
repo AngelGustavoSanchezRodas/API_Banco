@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using API_Banco.Application.Constants;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Persistencia;
 using API_Banco.Domain.Entities;
@@ -27,9 +28,11 @@ namespace API_Banco.Infrastructure.Repositories
 
         public async Task<CuentahabienteResumen?> ObtenerPorIdAsync(int idCliente, CancellationToken cancellationToken = default)
         {
+            // Excluimos al cliente sistema: no es un cuentahabiente real, no debe asomar
+            // en consultas del padrón ni habilitar operaciones de cliente sobre él.
             return await _context.Clientes
                 .AsNoTracking()
-                .Where(c => c.IdCliente == idCliente)
+                .Where(c => c.IdCliente == idCliente && c.Dpi != CodigosClienteSistema.Dpi)
                 .Select(c => new CuentahabienteResumen(
                     c.IdCliente, c.Dpi, c.Nombre, c.Apellido, c.Nit, c.Celular, c.Email))
                 .FirstOrDefaultAsync(cancellationToken);
@@ -37,6 +40,8 @@ namespace API_Banco.Infrastructure.Repositories
 
         public async Task<Cliente?> ObtenerEntidadPorIdAsync(int idCliente, CancellationToken cancellationToken = default)
         {
+            // No filtramos el cliente sistema aquí: este método se usa internamente
+            // (p.ej. al registrar pagos de servicios, donde sí necesitamos las cuentas internas).
             return await _context.Clientes.FirstOrDefaultAsync(c => c.IdCliente == idCliente, cancellationToken);
         }
 
@@ -44,7 +49,7 @@ namespace API_Banco.Infrastructure.Repositories
         {
             return await _context.Clientes
                 .AsNoTracking()
-                .Where(c => c.Dpi == dpi)
+                .Where(c => c.Dpi == dpi && c.Dpi != CodigosClienteSistema.Dpi)
                 .Select(c => new CuentahabienteResumen(
                     c.IdCliente, c.Dpi, c.Nombre, c.Apellido, c.Nit, c.Celular, c.Email))
                 .FirstOrDefaultAsync(cancellationToken);
@@ -54,6 +59,7 @@ namespace API_Banco.Infrastructure.Repositories
         {
             return await _context.Clientes
                 .AsNoTracking()
+                .Where(c => c.Dpi != CodigosClienteSistema.Dpi)
                 .Select(c => new CuentahabienteResumen(
                     c.IdCliente, c.Dpi, c.Nombre, c.Apellido, c.Nit, c.Celular, c.Email))
                 .ToListAsync(cancellationToken);
