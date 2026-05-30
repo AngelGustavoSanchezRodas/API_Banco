@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using API_Banco.Application.Interfaces;
 using API_Banco.Infrastructure.Persistence;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -14,11 +15,19 @@ namespace API_Banco.Controllers
     {
         private readonly BancoDbContext _context;
         private readonly IConfiguration _config;
+        private readonly IHasherCredenciales _hasher;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(BancoDbContext context, IConfiguration config)
+        public AuthController(
+            BancoDbContext context,
+            IConfiguration config,
+            IHasherCredenciales hasher,
+            ILogger<AuthController> logger)
         {
             _context = context;
             _config = config;
+            _hasher = hasher;
+            _logger = logger;
         }
 
         [HttpPost("login")]
@@ -27,12 +36,28 @@ namespace API_Banco.Controllers
             if (string.IsNullOrWhiteSpace(request.Credencial) || string.IsNullOrWhiteSpace(request.Password))
                 return Unauthorized();
 
+            // Tracking habilitado: si el password está en texto plano lo re-hasheamos
+            // en este mismo request para migrar transparentemente al esquema BCrypt.
             var usuario = await _context.UsuariosAcceso
-                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.CorreoElectronico == request.Credencial || u.NombreUsuario == request.Credencial, cancellationToken);
 
-            if (usuario is null || usuario.PasswordHash != request.Password)
+            if (usuario is null || !_hasher.Verificar(request.Password, usuario.PasswordHash))
                 return Unauthorized();
+
+            if (!_hasher.EsHashValido(usuario.PasswordHash))
+            {
+                usuario.PasswordHash = _hasher.Hashear(request.Password);
+                try
+                {
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateException ex)
+                {
+                    _logger.LogWarning(ex,
+                        "No se pudo migrar la password de '{Credencial}' a hash BCrypt. El login fue aceptado igualmente.",
+                        request.Credencial);
+                }
+            }
 
             // 1. Crear los "Claims" (Los datos cifrados dentro del token)
             var claims = new[]

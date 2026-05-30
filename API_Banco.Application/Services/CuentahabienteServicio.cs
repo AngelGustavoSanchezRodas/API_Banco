@@ -18,6 +18,7 @@ public sealed class CuentahabienteServicio(
     IEstadoRepositorio estados,
     INumeroCuentaGenerador numerosCuenta,
     INumeroTarjetaGenerador numerosTarjeta,
+    IHasherCredenciales hasher,
     IUnidadDeTrabajo unidadDeTrabajo) : ICuentahabienteServicio
 {
     /// <inheritdoc />
@@ -69,7 +70,7 @@ public sealed class CuentahabienteServicio(
                 cliente,
                 dpi,
                 email ?? string.Empty,
-                password,
+                hasher.Hashear(password),
                 "CLIENTE",
                 cancellationToken)
             .ConfigureAwait(false);
@@ -156,7 +157,7 @@ public sealed class CuentahabienteServicio(
             .RegistrarTarjetaPendienteAsync(
                 dto.IdCuenta,
                 numeroTarjeta,
-                pin,
+                hasher.Hashear(pin),
                 fechaVencimiento,
                 idEstadoTarjeta.Value,
                 cancellationToken)

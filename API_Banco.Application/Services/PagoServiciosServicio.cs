@@ -27,6 +27,7 @@ public sealed class PagoServiciosServicio(
     IRegistroPagoServicioRepositorio registrosPago,
     IConfiguracionDistribucionPagos distribucion,
     INotificacionEmpresaServicio notificacionEmpresa,
+    IHasherCredenciales hasher,
     IUnidadDeTrabajo unidadDeTrabajo,
     IProveedorFecha fecha,
     ILogger<PagoServiciosServicio> logger) : IPagoServiciosServicio
@@ -232,8 +233,15 @@ public sealed class PagoServiciosServicio(
         if (tarjeta is null || tarjeta.IdEstado != 1)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta no existe o está inactiva.");
 
-        if (!string.Equals(tarjeta.PinHash, dto.Pin.Trim(), StringComparison.Ordinal))
+        var pinIngresado = dto.Pin.Trim();
+        if (!hasher.Verificar(pinIngresado, tarjeta.PinHash))
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("PIN incorrecto.");
+
+        // Migración transparente: si el PIN estaba almacenado en texto plano y la
+        // verificación cayó por el camino legacy, lo rehasheamos ahora aprovechando
+        // que la entidad ya está siendo trackeada por EF Core para este pago.
+        if (!hasher.EsHashValido(tarjeta.PinHash))
+            tarjeta.PinHash = hasher.Hashear(pinIngresado);
 
         // Si el cliente envió la fecha de vencimiento, la validamos contra los
         // datos impresos en la tarjeta. No exponemos cuál de los dos no coincide

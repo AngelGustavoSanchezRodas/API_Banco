@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace API_Banco.Controllers
@@ -11,10 +12,12 @@ namespace API_Banco.Controllers
     /// Útil porque en Azure App Service las "Application Settings" sobrescriben
     /// los valores de appsettings.json en runtime, y normalmente la única forma
     /// de saber qué quedó efectivamente cargado es revisar el portal.
-    /// Este endpoint permite hacerlo sin entrar al portal.
+    /// Restringido a rol ADMIN porque aún revelando solo huellas, expone qué
+    /// integraciones están activas y la longitud/prefijo de las API keys.
     /// </remarks>
     [ApiController]
     [Route("api/diagnostico")]
+    [Authorize(Roles = "ADMIN")]
     public class DiagnosticoController : ControllerBase
     {
         private readonly IConfiguration _configuration;

@@ -2,10 +2,12 @@ using API_Banco.Application.Interfaces;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Interfaces.Servicios;
 using API_Banco.Application.Services;
+using API_Banco.Auth;
 using API_Banco.Infrastructure.Integrations;
 using API_Banco.Infrastructure.Persistence;
 using API_Banco.Infrastructure.Repositories;
 using API_Banco.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 // [NUEVO] Librerías necesarias para JWT
@@ -100,7 +102,23 @@ namespace API_Banco
                             return Task.CompletedTask;
                         }
                     };
+                })
+                .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+                    ApiKeyAuthenticationOptions.Scheme,
+                    _ => { });
+
+            // Policy "PortalOSocioBancario": cualquiera de los dos esquemas
+            // (JWT del cliente o API Key del socio) autoriza el acceso.
+            // Se usa en endpoints de pago expuestos tanto al frontend como a las APIs externas.
+            builder.Services.AddAuthorization(options =>
+            {
+                options.AddPolicy("PortalOSocioBancario", policy =>
+                {
+                    policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+                    policy.AuthenticationSchemes.Add(ApiKeyAuthenticationOptions.Scheme);
+                    policy.RequireAuthenticatedUser();
                 });
+            });
             // ========================================================================
 
             // 4. Inyección de la Capa de Aplicación (Servicios)
@@ -109,6 +127,7 @@ namespace API_Banco
             builder.Services.AddScoped<IPagoServiciosServicio, PagoServiciosServicio>();
             builder.Services.AddScoped<IBitacoraServicio, BitacoraServicio>();
             builder.Services.AddSingleton<IProveedorFecha, ProveedorFechaSistema>();
+            builder.Services.AddSingleton<IHasherCredenciales, HasherCredencialesBCrypt>();
 
             // 5. Inyección de la Capa de Infraestructura (Repositorios)
             builder.Services.AddScoped<IUnidadDeTrabajo, UnidadDeTrabajo>();
