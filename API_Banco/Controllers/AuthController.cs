@@ -70,7 +70,28 @@ namespace API_Banco.Controllers
             };
 
             if (usuario.IdCliente.HasValue)
+            {
                 claims.Add(new Claim("idCliente", usuario.IdCliente.Value.ToString()));
+
+                // Incluir nombre y apellido como claims estándar para que el frontend
+                // pueda mostrar el titular real (p.ej. en la tarjeta) sin un endpoint extra.
+                var cliente = await _context.Clientes
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.IdCliente == usuario.IdCliente.Value, cancellationToken);
+                if (cliente is not null)
+                {
+                    var nombre = (cliente.Nombre ?? string.Empty).Trim();
+                    var apellido = (cliente.Apellido ?? string.Empty).Trim();
+                    var completo = $"{nombre} {apellido}".Trim();
+
+                    if (!string.IsNullOrEmpty(nombre))
+                        claims.Add(new Claim(JwtRegisteredClaimNames.GivenName, nombre));
+                    if (!string.IsNullOrEmpty(apellido))
+                        claims.Add(new Claim(JwtRegisteredClaimNames.FamilyName, apellido));
+                    if (!string.IsNullOrEmpty(completo))
+                        claims.Add(new Claim(JwtRegisteredClaimNames.Name, completo));
+                }
+            }
 
             // 2. Traer la llave secreta del appsettings.json
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
