@@ -26,22 +26,36 @@ namespace API_Banco
             // ========================================================================
             // 1. CONFIGURACIÓN ESTRICTA Y DINÁMICA DE CORS
             // ========================================================================
-            // Leemos la URL del frontend base
-            var frontendUrl = builder.Configuration["FrontendUrl"]
+            // `FrontendUrl` puede contener UNA o VARIAS URLs separadas por coma para
+            // soportar distintos entornos (localhost, Azure Static Web Apps, etc.)
+            // sin redeployar el backend. Ej.:
+            //   FrontendUrl = "https://localhost:5173,https://icy-rock-xxx.azurestaticapps.net"
+            var frontendRaw = builder.Configuration["FrontendUrl"]
                 ?? throw new InvalidOperationException("🚨 ERROR CRÍTICO: La variable de entorno 'FrontendUrl' no está configurada.");
+
+            // Helper local: parsea una cadena con orígenes separados por coma o salto
+            // de línea, limpia espacios/slashes, descarta valores vacíos y rechaza los
+            // marcadores tipo "REEMPLAZAR_*" usados como placeholder en config.
+            static IEnumerable<string> ParsearOrigenes(string? raw) =>
+                (raw ?? string.Empty)
+                    .Split(new[] { ',', ';', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(u => u.TrimEnd('/'))
+                    .Where(u => u.Length > 0 && !u.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase));
 
             // Extraemos las URLs de las APIs integradas desde appsettings.json
             var universidadUrl = builder.Configuration["Integraciones:UniversidadApiUrl"];
             var energiaUrl = builder.Configuration["Integraciones:EnergiaApiUrl"];
             var telefoniaUrl = builder.Configuration["Integraciones:TelefoniaApiUrl"];
 
-            // Construimos la lista de orígenes permitidos de forma dinámica
-            var origenesPermitidos = new List<string> { frontendUrl.TrimEnd('/') };
+            // Construimos la lista de orígenes permitidos sin duplicados y normalizada.
+            var origenesPermitidos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var u in ParsearOrigenes(frontendRaw)) origenesPermitidos.Add(u);
+            foreach (var u in ParsearOrigenes(universidadUrl)) origenesPermitidos.Add(u);
+            foreach (var u in ParsearOrigenes(energiaUrl))     origenesPermitidos.Add(u);
+            foreach (var u in ParsearOrigenes(telefoniaUrl))   origenesPermitidos.Add(u);
 
-            if (!string.IsNullOrWhiteSpace(universidadUrl)) origenesPermitidos.Add(universidadUrl.TrimEnd('/'));
-            if (!string.IsNullOrWhiteSpace(energiaUrl)) origenesPermitidos.Add(energiaUrl.TrimEnd('/'));
-            if (!string.IsNullOrWhiteSpace(telefoniaUrl) && !telefoniaUrl.Contains("REEMPLAZAR", StringComparison.OrdinalIgnoreCase))
-                origenesPermitidos.Add(telefoniaUrl.TrimEnd('/'));
+            if (origenesPermitidos.Count == 0)
+                throw new InvalidOperationException("🚨 ERROR CRÍTICO: 'FrontendUrl' no contiene ningún origen válido.");
 
             builder.Services.AddCors(options =>
             {
