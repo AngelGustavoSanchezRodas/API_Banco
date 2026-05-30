@@ -15,7 +15,13 @@ namespace API_Banco.Domain.Entities
         public virtual Cliente? Cliente { get; set; }
         public virtual TipoCuenta? TipoCuenta { get; set; }
         public virtual Estado? Estado { get; set; }
-        public virtual TarjetaDebito? Tarjeta { get; set; } 
+
+        /// <summary>
+        /// Histórico de tarjetas de débito asociadas a la cuenta. La regla de
+        /// negocio garantiza que exista <b>como máximo una tarjeta ACTIVA</b>
+        /// (las anteriores quedan INACTIVAS al reemitir).
+        /// </summary>
+        public virtual ICollection<TarjetaDebito> Tarjetas { get; set; } = new List<TarjetaDebito>();
         public virtual ICollection<TransaccionBanco> Transacciones { get; set; } = new List<TransaccionBanco>();
 
         public void Debitar(decimal monto)

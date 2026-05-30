@@ -1,3 +1,4 @@
+using API_Banco.Application.Constants;
 using API_Banco.Application.DTOs.Cuentahabientes;
 using API_Banco.Application.Interfaces.Repositorios;
 using API_Banco.Application.Persistencia;
@@ -42,20 +43,31 @@ public class CuentaRepositorio(BancoDbContext context) : ICuentaRepositorio
         int idCliente,
         CancellationToken cancellationToken = default)
     {
+        // Sólo nos interesa la tarjeta ACTIVA (puede haber otras INACTIVAS por
+        // reemisiones previas; ésas no salen en el listado para no duplicar la
+        // fila de la cuenta y para reflejar la realidad operativa).
         return await context.Cuentas
             .AsNoTracking()
             .Where(c => c.IdCliente == idCliente)
             .OrderBy(c => c.IdCuenta)
-            .Select(c => new CuentaListadaDto(
-                c.IdCuenta,
-                c.NoCuenta,
-                c.Saldo,
-                c.IdTipoCuenta,
-                c.TipoCuenta != null ? c.TipoCuenta.Descripcion : null,
-                c.IdEstado,
-                c.Tarjeta != null ? c.Tarjeta.NumeroTarjeta : null,
-                c.Tarjeta != null ? (int?)c.Tarjeta.FechaVencimiento.Month : null,
-                c.Tarjeta != null ? (int?)c.Tarjeta.FechaVencimiento.Year : null))
+            .Select(c => new
+            {
+                Cuenta = c,
+                TarjetaActiva = c.Tarjetas
+                    .Where(t => t.Estado != null && t.Estado.Descripcion == CodigosEstado.Activo)
+                    .OrderByDescending(t => t.IdTarjeta)
+                    .FirstOrDefault()
+            })
+            .Select(x => new CuentaListadaDto(
+                x.Cuenta.IdCuenta,
+                x.Cuenta.NoCuenta,
+                x.Cuenta.Saldo,
+                x.Cuenta.IdTipoCuenta,
+                x.Cuenta.TipoCuenta != null ? x.Cuenta.TipoCuenta.Descripcion : null,
+                x.Cuenta.IdEstado,
+                x.TarjetaActiva != null ? x.TarjetaActiva.NumeroTarjeta : null,
+                x.TarjetaActiva != null ? (int?)x.TarjetaActiva.FechaVencimiento.Month : null,
+                x.TarjetaActiva != null ? (int?)x.TarjetaActiva.FechaVencimiento.Year : null))
             .ToListAsync(cancellationToken);
     }
 

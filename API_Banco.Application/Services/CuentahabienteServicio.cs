@@ -153,6 +153,21 @@ public sealed class CuentahabienteServicio(
         if (idEstadoTarjeta is null)
             return ResultadoOperacion<TarjetaDebitoDto>.Fallo("No está configurado el estado ACTIVO para tarjetas.");
 
+        var idEstadoInactivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Inactivo, cancellationToken).ConfigureAwait(false);
+        if (idEstadoInactivo is null)
+            return ResultadoOperacion<TarjetaDebitoDto>.Fallo("No está configurado el estado INACTIVO para tarjetas.");
+
+        // Regla de negocio: una sola tarjeta ACTIVA por cuenta. Si ésta es una
+        // reemisión, las tarjetas activas previas pasan a INACTIVO en la misma
+        // unidad de trabajo que crea la nueva (todo-o-nada).
+        await tarjetas
+            .BloquearTarjetasActivasDeCuentaAsync(
+                dto.IdCuenta,
+                idEstadoTarjeta.Value,
+                idEstadoInactivo.Value,
+                cancellationToken)
+            .ConfigureAwait(false);
+
         var pin = GenerarPinTemporal();
         var fechaVencimiento = GenerarFechaVencimiento();
         var numeroTarjeta = await numerosTarjeta.GenerarSiguienteNumeroTarjetaAsync(cancellationToken).ConfigureAwait(false);

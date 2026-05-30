@@ -25,4 +25,16 @@ public interface ITarjetaDebitoRepositorio
     Task<TarjetaDebitoCreada?> ObtenerUltimaPorCuentaAsync(int idCuenta, CancellationToken cancellationToken = default);
 
     Task<TarjetaDebito?> ObtenerPorNumeroAsync(string numeroTarjeta, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marca como INACTIVAS todas las tarjetas que actualmente estén ACTIVAS en la cuenta indicada.
+    /// Se usa al reemitir una tarjeta para garantizar la regla de negocio
+    /// "una sola tarjeta activa por cuenta".
+    /// </summary>
+    /// <returns>Cantidad de tarjetas que fueron bloqueadas.</returns>
+    Task<int> BloquearTarjetasActivasDeCuentaAsync(
+        int idCuenta,
+        int idEstadoActivo,
+        int idEstadoInactivo,
+        CancellationToken cancellationToken = default);
 }

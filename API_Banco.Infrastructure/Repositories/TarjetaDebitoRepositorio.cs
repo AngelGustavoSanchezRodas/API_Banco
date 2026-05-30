@@ -36,4 +36,20 @@ public class TarjetaDebitoRepositorio(BancoDbContext context) : ITarjetaDebitoRe
             .Include(t => t.Cuenta)
             .FirstOrDefaultAsync(t => t.NumeroTarjeta == numeroTarjeta, cancellationToken);
     }
+
+    public async Task<int> BloquearTarjetasActivasDeCuentaAsync(
+        int idCuenta,
+        int idEstadoActivo,
+        int idEstadoInactivo,
+        CancellationToken cancellationToken = default)
+    {
+        var activas = await context.TarjetasDebito
+            .Where(t => t.IdCuenta == idCuenta && t.IdEstado == idEstadoActivo)
+            .ToListAsync(cancellationToken);
+
+        foreach (var tarjeta in activas)
+            tarjeta.IdEstado = idEstadoInactivo;
+
+        return activas.Count;
+    }
 }

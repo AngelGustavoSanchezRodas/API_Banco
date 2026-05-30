@@ -95,8 +95,8 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.HasIndex(e => e.NumeroTarjeta).IsUnique();
 
                 entity.HasOne(e => e.Cuenta)
-                    .WithOne(c => c.Tarjeta)
-                    .HasForeignKey<TarjetaDebito>(e => e.IdCuenta);
+                    .WithMany(c => c.Tarjetas)
+                    .HasForeignKey(e => e.IdCuenta);
 
                 entity.HasOne(e => e.Estado)
                     .WithMany()
