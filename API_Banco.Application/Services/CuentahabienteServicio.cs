@@ -41,7 +41,7 @@ public sealed class CuentahabienteServicio(
         var apellido = dto.Apellido.Trim();
         var celular = string.IsNullOrWhiteSpace(dto.Celular) ? null : dto.Celular.Trim();
         var email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
-        var password = GenerarPasswordTemporal(dpi);
+        var password = GenerarPasswordTemporal();
 
         if (string.IsNullOrWhiteSpace(nit))
             return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("El NIT es obligatorio.");
@@ -75,13 +75,17 @@ public sealed class CuentahabienteServicio(
                 cancellationToken)
             .ConfigureAwait(false);
 
+        var idEstadoPendiente = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.PendienteActivacion, cancellationToken).ConfigureAwait(false);
+        if (idEstadoPendiente is null)
+            return ResultadoOperacion<CuentahabienteCreadoDto>.Fallo("Estado PENDIENTE_ACTIVACION no configurado para cuentas.");
+
         var noCuenta = await numerosCuenta.GenerarSiguienteNumeroCuentaAsync(cancellationToken).ConfigureAwait(false);
         await cuentas
             .RegistrarCuentaPendienteAsync(
                 noCuenta,
                 cliente,
                 dto.IdTipoCuenta,
-                3,
+                idEstadoPendiente.Value,
                 0m,
                 cancellationToken)
             .ConfigureAwait(false);
@@ -151,7 +155,6 @@ public sealed class CuentahabienteServicio(
 
         var pin = GenerarPinTemporal();
         var fechaVencimiento = GenerarFechaVencimiento();
-        var cvv = GenerarCvvTemporal();
         var numeroTarjeta = await numerosTarjeta.GenerarSiguienteNumeroTarjetaAsync(cancellationToken).ConfigureAwait(false);
         await tarjetas
             .RegistrarTarjetaPendienteAsync(
@@ -173,7 +176,6 @@ public sealed class CuentahabienteServicio(
             tarjeta.NumeroTarjeta,
             tarjeta.FechaVencimiento.Month,
             tarjeta.FechaVencimiento.Year,
-            cvv,
             pin);
 
         return ResultadoOperacion<TarjetaDebitoDto>.Ok(salida);
@@ -181,7 +183,10 @@ public sealed class CuentahabienteServicio(
 
     private static string GenerarPinTemporal()
     {
-        return Random.Shared.Next(0, 10000).ToString("D4");
+        // RandomNumberGenerator es criptográficamente seguro: el rango superior
+        // es exclusivo, así que [0, 10_000) cubre exactamente 0000-9999.
+        var valor = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, 10_000);
+        return valor.ToString("D4");
     }
 
 
@@ -191,14 +196,43 @@ public sealed class CuentahabienteServicio(
         return new DateTime(ahora.Year + 3, ahora.Month, 1).AddMonths(1).AddDays(-1);
     }
 
-    private static string GenerarCvvTemporal()
+    // Alfabetos sin caracteres ambiguos (sin I/l/1/O/0) para que el admin pueda
+    // dictar la password al cliente sin confundir letras y números.
+    private const string AlfabetoMayusculas = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    private const string AlfabetoMinusculas = "abcdefghijkmnopqrstuvwxyz";
+    private const string AlfabetoDigitos = "23456789";
+    private const string AlfabetoSimbolos = "@#$%&*+-=?";
+    private const int LongitudPasswordTemporal = 12;
+
+    private static string GenerarPasswordTemporal()
     {
-        return Random.Shared.Next(0, 1000).ToString("D3");
+        Span<char> buffer = stackalloc char[LongitudPasswordTemporal];
+
+        // Garantizamos al menos un carácter de cada familia, así la password
+        // siempre cumple políticas típicas (mayúscula, minúscula, número, símbolo).
+        buffer[0] = SacarChar(AlfabetoMayusculas);
+        buffer[1] = SacarChar(AlfabetoMinusculas);
+        buffer[2] = SacarChar(AlfabetoDigitos);
+        buffer[3] = SacarChar(AlfabetoSimbolos);
+
+        var alfabetoCombinado = AlfabetoMayusculas + AlfabetoMinusculas + AlfabetoDigitos + AlfabetoSimbolos;
+        for (var i = 4; i < buffer.Length; i++)
+            buffer[i] = SacarChar(alfabetoCombinado);
+
+        // Fisher-Yates con RNG criptográfico: mezcla las posiciones para que
+        // las garantías mínimas no queden siempre en los primeros 4 caracteres.
+        for (var i = buffer.Length - 1; i > 0; i--)
+        {
+            var j = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, i + 1);
+            (buffer[i], buffer[j]) = (buffer[j], buffer[i]);
+        }
+
+        return new string(buffer);
     }
 
-    private static string GenerarPasswordTemporal(string dpi)
+    private static char SacarChar(string alfabeto)
     {
-        var prefijo = dpi.Length >= 4 ? dpi[..4] : dpi;
-        return $"Temp{prefijo}!";
+        var indice = System.Security.Cryptography.RandomNumberGenerator.GetInt32(0, alfabeto.Length);
+        return alfabeto[indice];
     }
 }

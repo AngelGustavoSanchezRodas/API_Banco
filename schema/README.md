@@ -4,79 +4,55 @@
 
 | Archivo | Propósito |
 |---------|-----------|
-| `Dump20260519 Banco.sql` | Estructura (CREATE TABLE) |
-| `seed_banco.sql` | Datos mínimos sobre BD existente (no borra nada) |
-| `cleanup_banco.sql` | **Limpieza total** + datos de prueba mínimos |
+| `Dump20260529.sql` | Snapshot histórico (`mysqldump`) anterior a la última limpieza. Solo referencia. |
+| `wipe_and_admin.sql` | **Script único de operación**: limpia la BD, elimina campos no usados y deja un solo admin. |
+
+## Qué hace `wipe_and_admin.sql`
+
+1. **Elimina objetos no usados por el código C#**:
+   - Tabla `__efmigrationshistory` (artefacto sin uso, el proyecto no usa migraciones EF).
+   - Tabla `cuenta_comision_banco` (diseño viejo; el sistema acumula comisiones en `cuenta_bancaria.id_cuenta = 100`).
+   - Columna `bitacora_transacciones.descripcion` (nunca mapeada en `TransaccionBanco`).
+   - Columna `usuario_acceso.fecha_creacion` (nunca mapeada en `UsuarioAcceso`).
+2. **`TRUNCATE`** de todas las tablas transaccionales.
+3. **Re-siembra de catálogos** `estado`, `tipo_cuenta`, `tipo_transaccion` con los IDs que el código resuelve por nombre.
+4. **Re-siembra del cliente sistema (id=100)** y sus 4 cuentas internas (100=Comisiones, 101=Universidad, 102=Telefonía, 103=Energía). Indispensables porque están cableadas en `appsettings.json → Pagos:*`.
+5. **Crea un único usuario `ADMIN`**.
+
+> ⚠️ **Antes de ejecutar, hacer backup**. Es destructivo.
+
+## Único acceso resultante
+
+| Concepto | Valor |
+|----------|-------|
+| Correo | `admin@banco.local` |
+| Password | `Admin2026!` (texto plano la primera vez) |
+| Rol | `ADMIN` |
+
+La password queda en texto plano en la fila para arrancar; al **primer login exitoso** el banco la rehashea automáticamente con BCrypt (work factor 11) gracias al fallback transparente de `AuthController`. Para producción real, cambiarla por una nueva apenas se entre.
+
+## Cuentas internas obligatorias
+
+| `id_cuenta` | `no_cuenta` | Función | Llave en `appsettings.json` |
+|-------------|--------------|---------|------------------------------|
+| 100 | 9900000100 | Comisiones banco (5 %) | `Pagos:IdCuentaComisiones` |
+| 101 | 9900000101 | Prestadora Universidad UMG (95 %) | `Pagos:CuentasPrestadoras:Universidad` |
+| 102 | 9900000102 | Prestadora Telefonía (95 %) | `Pagos:CuentasPrestadoras:Telefonia` |
+| 103 | 9900000103 | Prestadora Energía Eléctrica (95 %) | `Pagos:CuentasPrestadoras:EnergiaElectrica` |
 
 ## Orden de ejecución en MySQL
 
-### Instalación nueva
-1. **Estructura:** `Dump20260519 Banco.sql`
-2. **Datos semilla:** `seed_banco.sql`
-
-### Resetear datos de prueba (BD ya existente)
-1. **Backup** (Workbench → Data Export)
-2. Ejecutar `cleanup_banco.sql`
-
-### Azure Data Studio / MySQL Workbench
-
-Conéctate a `api_banco` y ejecuta cada archivo en orden.
-
-### Línea de comandos (ejemplo)
+Conéctate a `api_banco` desde Workbench / Azure Data Studio / línea de comandos y ejecuta:
 
 ```bash
-mysql -h servicio-de-pago.mysql.database.azure.com -u USUARIO -p --ssl-mode=REQUIRED api_banco < "Dump20260519 Banco.sql"
-mysql -h servicio-de-pago.mysql.database.azure.com -u USUARIO -p --ssl-mode=REQUIRED api_banco < "seed_banco.sql"
+mysql -h servicio-de-pago.mysql.database.azure.com -u USUARIO -p --ssl-mode=REQUIRED api_banco < wipe_and_admin.sql
 ```
 
 ## Universidad (`api_universidad`)
 
-Los scripts de la API Universidad están en el repo **ApiUniversidadUMG**:
-
-| Archivo | Base de datos |
-|---------|----------------|
-| `ApiUniversidadUMG/schema/Dump20260519 Universidad.sql` | Estructura |
-| `ApiUniversidadUMG/schema/seed_universidad.sql` | Datos de prueba |
-
-Ejecutar **Universidad antes de probar pagos** (el banco consulta la deuda por HTTP).
-
-## Datos de prueba tras `cleanup_banco.sql`
-
-| Concepto | Valor |
-|----------|--------|
-| Login | `juan.perez@correo.test` / `Temp1012!` |
-| Tarjeta débito | `4123123456781234` |
-| PIN | `1234` |
-| Cuenta cliente (id) | `1` — `1000000001` — Q 10,000.00 |
-| Cuenta comisiones (id) | `100` — `9900000100` |
-| Cuenta prestadora Universidad | `101` — `9900000101` |
-| Cuenta prestadora Telefonía | `102` — `9900000102` |
-| Cuenta prestadora Energía | `103` — `9900000103` |
-
-Las cuentas internas 100-103 están enlazadas a `appsettings.Development.json → Pagos:*`.
-
-## Prueba de pago de servicios (Scalar)
-
-1. Levantar **ApiUniversidadUMG** (ej. `http://localhost:5212`).
-2. En `API_Banco/appsettings.Development.json` (o User Secrets):
-
-   ```json
-   "Integraciones": {
-     "UniversidadApiUrl": "http://localhost:5212"
-   }
-   ```
-
-3. Levantar **API_Banco** (ej. `http://localhost:5195`).
-4. Carnet universidad: `2024001001` — deuda **Q 1,500.00**.
-5. `POST api/Pagos/validar` → `tipoServicio: 1`, `identificador: "2024001001"`.
-6. `POST api/Pagos/ejecutar` → misma tarjeta/PIN, `monto: 1500.00`.
-
-## Telefonía (`tipoServicio = 2`)
-
-Ver [docs/TELEFONIA.md](../docs/TELEFONIA.md). Números postpago de demostración en `appsettings.json → Integraciones:TelefoniaDemoPostpago` (`82542114`, `55551234`).
+Para probar pagos universitarios, levantar **ApiUniversidadUMG** antes (el banco consulta la deuda por HTTP). Sus scripts están en el repo `ApiUniversidadUMG/schema/`.
 
 ## Notas
 
-- Los dumps solo traen **estructura**; sin `seed_banco.sql` faltan estados, tipos de transacción y cuentas 1/2.
-- Si ya existen filas con los mismos `id_*`, el seed actualiza descripciones/saldos sin borrar datos históricos.
-- Ajusta emails/DPI si chocan con registros ya creados en Azure.
+- Los IDs literales en `wipe_and_admin.sql` (1=ACTIVO, 6=TRANSFERENCIA_ORIGEN, etc.) son los que ya estaban en el dump. Si la fila ya existe, `INSERT IGNORE` evita el conflicto.
+- El código C# resuelve cada estado/tipo de transacción **por descripción** (vía `CodigosEstado` / `CodigosTipoTransaccion`), así que los IDs pueden cambiar sin romper la app, pero conviene mantenerlos fijos por consistencia con la bitácora histórica.

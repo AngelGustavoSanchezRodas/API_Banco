@@ -10,4 +10,6 @@ public static class CodigosTipoTransaccion
     public const string PagoServicioDebitoCuentahabiente = "PAGO_SERVICIO_DEBITO_CUENTAHABIENTE";
     public const string PagoServicioAcreditacionPrestadora = "PAGO_SERVICIO_ACREDITACION_PRESTADORA";
     public const string PagoServicioComisionBanco = "PAGO_SERVICIO_COMISION_BANCO";
+    public const string TransferenciaOrigen = "TRANSFERENCIA_ORIGEN";
+    public const string TransferenciaDestino = "TRANSFERENCIA_DESTINO";
 }

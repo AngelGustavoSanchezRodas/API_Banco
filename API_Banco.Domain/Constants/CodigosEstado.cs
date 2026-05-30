@@ -7,4 +7,5 @@ public static class CodigosEstado
 {
     public const string Activo = "ACTIVO";
     public const string Inactivo = "INACTIVO";
+    public const string PendienteActivacion = "PENDIENTE_ACTIVACION";
 }

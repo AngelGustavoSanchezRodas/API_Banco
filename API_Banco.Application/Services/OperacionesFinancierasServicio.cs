@@ -16,6 +16,7 @@ public sealed class OperacionesFinancierasServicio(
     ICuentaRepositorio cuentas,
     ITransaccionRepositorio transacciones,
     ITipoTransaccionRepositorio tiposTransaccion,
+    IEstadoRepositorio estados,
     IUnidadDeTrabajo unidadDeTrabajo,
     IProveedorFecha fecha) : IOperacionesFinancierasServicio
 {
@@ -33,18 +34,22 @@ public sealed class OperacionesFinancierasServicio(
         if (idTipo is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Tipo de transacción DEPOSITO no configurado.");
 
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
+        if (idEstadoActivo is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Estado ACTIVO no configurado para cuentas.");
+
         var cuenta = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
         if (cuenta is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
 
-        if (cuenta.IdEstado != 1)
+        if (cuenta.IdEstado != idEstadoActivo.Value)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no está activa.");
 
         cuenta.Acreditar(dto.Monto);
 
         var ahora = fecha.ObtenerUtcAhora();
-        await transacciones
-            .RegistrarMovimientoPendienteAsync(dto.IdCuenta, idTipo.Value, dto.Monto, ahora, cancellationToken)
+        var transaccion = await transacciones
+            .CrearMovimientoPendienteAsync(dto.IdCuenta, idTipo.Value, dto.Monto, ahora, cancellationToken)
             .ConfigureAwait(false);
         try
         {
@@ -56,17 +61,11 @@ public sealed class OperacionesFinancierasServicio(
                 "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
         }
 
-        var idTransaccion = await transacciones
-            .ObtenerIdUltimaTransaccionAsync(dto.IdCuenta, ahora, dto.Monto, idTipo.Value, cancellationToken)
-            .ConfigureAwait(false);
-
-        var saldo = cuenta.Saldo;
-
         var resultado = new MovimientoFinancieroResultadoDto(
-            idTransaccion,
+            transaccion.IdTransaccion,
             dto.IdCuenta,
             dto.Monto,
-            saldo,
+            cuenta.Saldo,
             ahora);
 
         return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Ok(resultado);
@@ -86,11 +85,15 @@ public sealed class OperacionesFinancierasServicio(
         if (idTipo is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Tipo de transacción RETIRO no configurado.");
 
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
+        if (idEstadoActivo is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Estado ACTIVO no configurado para cuentas.");
+
         var cuenta = await cuentas.ObtenerEntidadPorIdAsync(dto.IdCuenta, cancellationToken).ConfigureAwait(false);
         if (cuenta is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
 
-        if (cuenta.IdEstado != 1)
+        if (cuenta.IdEstado != idEstadoActivo.Value)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no está activa.");
 
         if (cuenta.Saldo < dto.Monto)
@@ -99,8 +102,8 @@ public sealed class OperacionesFinancierasServicio(
         cuenta.Debitar(dto.Monto);
 
         var ahora = fecha.ObtenerUtcAhora();
-        await transacciones
-            .RegistrarMovimientoPendienteAsync(dto.IdCuenta, idTipo.Value, dto.Monto, ahora, cancellationToken)
+        var transaccion = await transacciones
+            .CrearMovimientoPendienteAsync(dto.IdCuenta, idTipo.Value, dto.Monto, ahora, cancellationToken)
             .ConfigureAwait(false);
         try
         {
@@ -112,17 +115,11 @@ public sealed class OperacionesFinancierasServicio(
                 "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
         }
 
-        var idTransaccion = await transacciones
-            .ObtenerIdUltimaTransaccionAsync(dto.IdCuenta, ahora, dto.Monto, idTipo.Value, cancellationToken)
-            .ConfigureAwait(false);
-
-        var saldo = cuenta.Saldo;
-
         var resultado = new MovimientoFinancieroResultadoDto(
-            idTransaccion,
+            transaccion.IdTransaccion,
             dto.IdCuenta,
             dto.Monto,
-            saldo,
+            cuenta.Saldo,
             ahora);
 
         return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Ok(resultado);
@@ -152,11 +149,19 @@ public sealed class OperacionesFinancierasServicio(
         if (!ValidadoresEntrada.EsMontoValido(montoDeposito))
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("El monto del depósito debe ser mayor que cero.");
 
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo).ConfigureAwait(false);
+        if (idEstadoActivo is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Estado ACTIVO no configurado para cuentas.");
+
+        var idEstadoPendiente = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.PendienteActivacion).ConfigureAwait(false);
+        if (idEstadoPendiente is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Estado PENDIENTE_ACTIVACION no configurado para cuentas.");
+
         var cuenta = await cuentas.ObtenerEntidadPorIdAsync(idCuenta).ConfigureAwait(false);
         if (cuenta is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no existe.");
 
-        if (cuenta.IdEstado != 3)
+        if (cuenta.IdEstado != idEstadoPendiente.Value)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta no está pendiente de activación.");
 
         var idTipoDeposito = await tiposTransaccion
@@ -165,7 +170,7 @@ public sealed class OperacionesFinancierasServicio(
         if (idTipoDeposito is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Tipo de transacción DEPOSITO no configurado.");
 
-        cuenta.IdEstado = 1;
+        cuenta.IdEstado = idEstadoActivo.Value;
         cuenta.Acreditar(montoDeposito);
 
         var ahora = fecha.ObtenerUtcAhora();
@@ -209,6 +214,20 @@ public sealed class OperacionesFinancierasServicio(
         if (!ValidadoresEntrada.EsMontoValido(monto))
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("El monto de la transferencia debe ser mayor que cero.");
 
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo).ConfigureAwait(false);
+        if (idEstadoActivo is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Estado ACTIVO no configurado para cuentas.");
+
+        var idTipoOrigen = await tiposTransaccion
+            .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.TransferenciaOrigen)
+            .ConfigureAwait(false);
+        var idTipoDestino = await tiposTransaccion
+            .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.TransferenciaDestino)
+            .ConfigureAwait(false);
+        if (idTipoOrigen is null || idTipoDestino is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
+                "Tipos de transacción TRANSFERENCIA_ORIGEN / TRANSFERENCIA_DESTINO no configurados.");
+
         var cuentaOrigen = await cuentas.ObtenerEntidadPorIdAsync(idCuentaOrigen).ConfigureAwait(false);
         if (cuentaOrigen is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta origen no existe.");
@@ -217,7 +236,7 @@ public sealed class OperacionesFinancierasServicio(
         if (cuentaDestino is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta destino no existe.");
 
-        if (cuentaOrigen.IdEstado != 1 || cuentaDestino.IdEstado != 1)
+        if (cuentaOrigen.IdEstado != idEstadoActivo.Value || cuentaDestino.IdEstado != idEstadoActivo.Value)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Ambas cuentas deben estar activas.");
 
         if (cuentaOrigen.Saldo < monto)
@@ -232,12 +251,12 @@ public sealed class OperacionesFinancierasServicio(
         var ahora = fecha.ObtenerUtcAhora();
 
         var transaccionOrigen = await transacciones
-            .CrearMovimientoPendienteAsync(idCuentaOrigen, 6, monto, ahora)
+            .CrearMovimientoPendienteAsync(idCuentaOrigen, idTipoOrigen.Value, monto, ahora)
             .ConfigureAwait(false);
         transaccionOrigen.ReferenciaVinculante = referenciaVinculante;
 
         var transaccionDestino = await transacciones
-            .CrearMovimientoPendienteAsync(idCuentaDestino, 7, monto, ahora)
+            .CrearMovimientoPendienteAsync(idCuentaDestino, idTipoDestino.Value, monto, ahora)
             .ConfigureAwait(false);
         transaccionDestino.ReferenciaVinculante = referenciaVinculante;
 

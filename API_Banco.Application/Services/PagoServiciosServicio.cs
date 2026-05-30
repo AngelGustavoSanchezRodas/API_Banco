@@ -24,6 +24,7 @@ public sealed class PagoServiciosServicio(
     ITarjetaDebitoRepositorio tarjetas,
     ITransaccionRepositorio transacciones,
     ITipoTransaccionRepositorio tiposTransaccion,
+    IEstadoRepositorio estados,
     IRegistroPagoServicioRepositorio registrosPago,
     IConfiguracionDistribucionPagos distribucion,
     INotificacionEmpresaServicio notificacionEmpresa,
@@ -229,8 +230,12 @@ public sealed class PagoServiciosServicio(
                 ex.Message);
         }
 
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
+        if (idEstadoActivo is null)
+            return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("Estado ACTIVO no configurado.");
+
         var tarjeta = await tarjetas.ObtenerPorNumeroAsync(dto.NumeroTarjeta.Trim(), cancellationToken).ConfigureAwait(false);
-        if (tarjeta is null || tarjeta.IdEstado != 1)
+        if (tarjeta is null || tarjeta.IdEstado != idEstadoActivo.Value)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La tarjeta no existe o está inactiva.");
 
         var pinIngresado = dto.Pin.Trim();
@@ -269,7 +274,7 @@ public sealed class PagoServiciosServicio(
 
         var cuentaPagadora = tarjeta.Cuenta;
 
-        if (cuentaPagadora.IdEstado != 1)
+        if (cuentaPagadora.IdEstado != idEstadoActivo.Value)
             return ResultadoOperacion<PagoServicioResultadoDto>.Fallo("La cuenta no está activa.");
 
         if (cuentaPagadora.Saldo < dto.Monto)
@@ -299,11 +304,11 @@ public sealed class PagoServiciosServicio(
         var transaccionDebito = await transacciones
             .CrearMovimientoPendienteAsync(cuentaPagadora.IdCuenta, idTipoDebito.Value, dto.Monto, ahora, cancellationToken)
             .ConfigureAwait(false);
-        await transacciones
-            .RegistrarMovimientoPendienteAsync(idCuentaPrestadora, idTipoPrestadora.Value, montoPrestadora, ahora, cancellationToken)
+        var transaccionPrestadora = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaPrestadora, idTipoPrestadora.Value, montoPrestadora, ahora, cancellationToken)
             .ConfigureAwait(false);
-        await transacciones
-            .RegistrarMovimientoPendienteAsync(idCuentaComisiones, idTipoComision.Value, comisionBanco, ahora, cancellationToken)
+        var transaccionComision = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaComisiones, idTipoComision.Value, comisionBanco, ahora, cancellationToken)
             .ConfigureAwait(false);
 
         var registroPago = new RegistroPagoServicio
@@ -327,15 +332,10 @@ public sealed class PagoServiciosServicio(
                 "La transacción no pudo completarse porque el saldo fue modificado por otra operación simultánea. Por favor, verifique su saldo e intente de nuevo.");
         }
 
-        var idDebito = await transacciones
-            .ObtenerIdUltimaTransaccionAsync(cuentaPagadora.IdCuenta, ahora, dto.Monto, idTipoDebito.Value, cancellationToken)
-            .ConfigureAwait(false);
-        var idPrestadora = await transacciones
-            .ObtenerIdUltimaTransaccionAsync(idCuentaPrestadora, ahora, montoPrestadora, idTipoPrestadora.Value, cancellationToken)
-            .ConfigureAwait(false);
-        var idComision = await transacciones
-            .ObtenerIdUltimaTransaccionAsync(idCuentaComisiones, ahora, comisionBanco, idTipoComision.Value, cancellationToken)
-            .ConfigureAwait(false);
+        // EF Core poblado IdTransaccion en cada entidad tras el SaveChanges anterior.
+        var idDebito = transaccionDebito.IdTransaccion;
+        var idPrestadora = transaccionPrestadora.IdTransaccion;
+        var idComision = transaccionComision.IdTransaccion;
 
         var saldoPosterior = cuentaPagadora.Saldo;
 

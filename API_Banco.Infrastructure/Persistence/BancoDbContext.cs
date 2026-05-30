@@ -15,7 +15,6 @@ namespace API_Banco.Infrastructure.Persistence
         public DbSet<TarjetaDebito> TarjetasDebito { get; set; }
         public DbSet<TransaccionBanco> TransaccionesBanco { get; set; }
         public DbSet<RegistroPagoServicio> RegistroPagosServicios { get; set; }
-        public DbSet<CuentaComision> CuentasComision { get; set; }
         public DbSet<UsuarioAcceso> UsuariosAcceso { get; set; }
         public DbSet<Estado> Estados { get; set; }
         public DbSet<TipoTransaccion> TiposTransaccion { get; set; }
@@ -159,16 +158,6 @@ namespace API_Banco.Infrastructure.Persistence
                 entity.HasOne(e => e.TransaccionOrigen)
                     .WithMany()
                     .HasForeignKey(e => e.IdTransaccionOrigen);
-            });
-
-            modelBuilder.Entity<CuentaComision>(entity =>
-            {
-                entity.ToTable("cuenta_comision_banco");
-                entity.HasKey(e => e.IdCuentaComision);
-
-                entity.Property(e => e.IdCuentaComision).HasColumnName("id_comision_cuenta");
-                entity.Property(e => e.NombreCuenta).HasColumnName("nombre_cuenta");
-                entity.Property(e => e.SaldoAcumulado).HasColumnName("saldo_acumulado");
             });
 
             modelBuilder.Entity<UsuarioAcceso>(entity =>

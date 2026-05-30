@@ -9,30 +9,16 @@ namespace API_Banco.Application.Interfaces.Repositorios;
 public interface ITransaccionRepositorio
 {
     /// <summary>
-    /// Registra un movimiento pendiente de confirmación con <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>.
+    /// Crea un movimiento pendiente y devuelve la entidad rastreada por EF Core.
+    /// El <see cref="TransaccionBanco.IdTransaccion"/> queda poblado automáticamente
+    /// tras <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>; no se requiere
+    /// re-consultar el ID con queries auxiliares.
     /// </summary>
-    Task RegistrarMovimientoPendienteAsync(
-        int idCuenta,
-        int idTipoTransaccion,
-        decimal monto,
-        DateTime fechaUtc,
-        CancellationToken cancellationToken = default);
-
     Task<TransaccionBanco> CrearMovimientoPendienteAsync(
         int idCuenta,
         int idTipoTransaccion,
         decimal monto,
         DateTime fechaUtc,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Obtiene el identificador del último movimiento que coincide con los datos registrados (tras guardar cambios).
-    /// </summary>
-    Task<int> ObtenerIdUltimaTransaccionAsync(
-        int idCuenta,
-        DateTime fechaUtc,
-        decimal monto,
-        int idTipoTransaccion,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<TransaccionKardexItem>> ListarPorCuentaOrdenCronologicoAsync(

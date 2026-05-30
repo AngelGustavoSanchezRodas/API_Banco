@@ -193,13 +193,15 @@ namespace API_Banco
             builder.Services.AddScoped<IValidadorIdentificadorServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
             builder.Services.AddScoped<INotificacionEmpresaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
             builder.Services.AddScoped<IConsultaDeudaServicio>(sp => sp.GetRequiredService<GestorIntegracionServicios>());
-            builder.Services.AddScoped<INumeroCuentaGenerador, GeneradoresMock>();
-            builder.Services.AddScoped<INumeroTarjetaGenerador, GeneradoresMock>();
-            builder.Services.AddScoped<IConfiguracionDistribucionPagos, ConfiguracionPagosMock>();
+            builder.Services.AddScoped<INumeroCuentaGenerador, GeneradorNumerosCriptografico>();
+            builder.Services.AddScoped<INumeroTarjetaGenerador, GeneradorNumerosCriptografico>();
+            builder.Services.AddScoped<IConfiguracionDistribucionPagos, ConfiguracionPagosPorAppSettings>();
 
             var app = builder.Build();
 
-            if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+            // Explorador Scalar + OpenAPI: solo Development. En Producción se ocultan
+            // para no exponer la superficie completa del API ni facilitar fingerprinting.
+            if (app.Environment.IsDevelopment())
             {
                 app.MapScalarApiReference();
                 app.MapOpenApi();
@@ -229,7 +231,13 @@ namespace API_Banco
                     var logger = context.RequestServices
                         .GetRequiredService<ILoggerFactory>()
                         .CreateLogger("UnhandledException");
-                    logger.LogError(ex, "Excepción no controlada en {Path}", context.Request.Path);
+
+                    // El traceId permite correlacionar el error que ve el cliente
+                    // con la entrada completa (stack trace, inner exception) en Application Logs.
+                    var traceId = System.Diagnostics.Activity.Current?.Id ?? context.TraceIdentifier;
+                    logger.LogError(ex,
+                        "Excepción no controlada en {Path}. TraceId={TraceId}",
+                        context.Request.Path, traceId);
 
                     if (!context.Response.HasStarted)
                     {
@@ -237,15 +245,33 @@ namespace API_Banco
                         context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                         context.Response.ContentType = "application/json";
 
-                        var payload = System.Text.Json.JsonSerializer.Serialize(new
+                        object payload;
+                        if (app.Environment.IsDevelopment())
                         {
-                            error = "Excepción no controlada en el banco.",
-                            tipo = ex.GetType().FullName,
-                            mensaje = ex.Message,
-                            innerMensaje = ex.InnerException?.Message,
-                            path = context.Request.Path.Value
-                        });
-                        await context.Response.WriteAsync(payload);
+                            // En desarrollo sí incluimos detalles para depurar localmente.
+                            payload = new
+                            {
+                                error = "Excepción no controlada en el banco.",
+                                tipo = ex.GetType().FullName,
+                                mensaje = ex.Message,
+                                innerMensaje = ex.InnerException?.Message,
+                                path = context.Request.Path.Value,
+                                traceId
+                            };
+                        }
+                        else
+                        {
+                            // En producción solo devolvemos un id de correlación; los
+                            // detalles del error nunca llegan al cliente para no exponer
+                            // estructura interna ni datos sensibles que el mensaje pudiera arrastrar.
+                            payload = new
+                            {
+                                error = "Ocurrió un error procesando la solicitud. Reporte el traceId al soporte del banco.",
+                                traceId
+                            };
+                        }
+
+                        await context.Response.WriteAsync(System.Text.Json.JsonSerializer.Serialize(payload));
                     }
                 }
             });
