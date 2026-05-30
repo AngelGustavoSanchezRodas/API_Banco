@@ -85,5 +85,17 @@ namespace API_Banco.Controllers
 
             return Ok(resultado.Valor);
         }
+
+        [HttpPost("{idCliente:int}/reset-password")]
+        [Authorize(Roles = "ADMIN")] // [SEGURIDAD] Sólo administradores pueden resetear credenciales de un cuentahabiente
+        public async Task<IActionResult> ResetearPassword(int idCliente, CancellationToken cancellationToken)
+        {
+            var resultado = await _cuentahabienteServicio.ResetearPasswordAsync(idCliente, cancellationToken);
+
+            if (!resultado.Exito)
+                return BadRequest(new { error = resultado.MensajeError, detalles = resultado.Detalles });
+
+            return Ok(resultado.Valor);
+        }
     }
 }

@@ -196,6 +196,42 @@ public sealed class CuentahabienteServicio(
         return ResultadoOperacion<TarjetaDebitoDto>.Ok(salida);
     }
 
+    /// <inheritdoc />
+    public async Task<ResultadoOperacion<PasswordReseteadaDto>> ResetearPasswordAsync(
+        int idCliente,
+        CancellationToken cancellationToken = default)
+    {
+        if (idCliente <= 0)
+            return ResultadoOperacion<PasswordReseteadaDto>.Fallo("El identificador de cliente no es válido.");
+
+        var cliente = await clientes.ObtenerEntidadPorIdAsync(idCliente, cancellationToken).ConfigureAwait(false);
+        if (cliente is null)
+            return ResultadoOperacion<PasswordReseteadaDto>.Fallo("No se encontró el cuentahabiente.");
+
+        var acceso = await clientes.ObtenerAccesoPorIdClienteAsync(idCliente, cancellationToken).ConfigureAwait(false);
+        if (acceso is null)
+            return ResultadoOperacion<PasswordReseteadaDto>.Fallo("El cuentahabiente no tiene un usuario de acceso registrado.");
+
+        // Por seguridad, el reseteo masivo desde el padrón sólo aplica a usuarios
+        // CLIENTE. Los ADMIN deben resetearse por un flujo separado (servidor / DBA).
+        if (!string.Equals(acceso.Rol, "CLIENTE", StringComparison.OrdinalIgnoreCase))
+            return ResultadoOperacion<PasswordReseteadaDto>.Fallo("Sólo se puede resetear la contraseña de un usuario CLIENTE.");
+
+        var nuevaPassword = GenerarPasswordTemporal();
+        acceso.PasswordHash = hasher.Hashear(nuevaPassword);
+
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+
+        var nombreCompleto = $"{cliente.Nombre} {cliente.Apellido}".Trim();
+        var salida = new PasswordReseteadaDto(
+            cliente.IdCliente,
+            nombreCompleto,
+            acceso.CorreoElectronico,
+            nuevaPassword);
+
+        return ResultadoOperacion<PasswordReseteadaDto>.Ok(salida);
+    }
+
     private static string GenerarPinTemporal()
     {
         // RandomNumberGenerator es criptográficamente seguro: el rango superior

@@ -27,13 +27,12 @@ namespace API_Banco.Infrastructure.Repositories
 
         public async Task<CuentahabienteResumen?> ObtenerPorIdAsync(int idCliente, CancellationToken cancellationToken = default)
         {
-            var cliente = await _context.Clientes
+            return await _context.Clientes
                 .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.IdCliente == idCliente, cancellationToken);
-
-            if (cliente is null) return null;
-
-            return new CuentahabienteResumen(cliente.IdCliente, cliente.Dpi, cliente.Nombre, cliente.Apellido);
+                .Where(c => c.IdCliente == idCliente)
+                .Select(c => new CuentahabienteResumen(
+                    c.IdCliente, c.Dpi, c.Nombre, c.Apellido, c.Nit, c.Celular, c.Email))
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         public async Task<Cliente?> ObtenerEntidadPorIdAsync(int idCliente, CancellationToken cancellationToken = default)
@@ -43,20 +42,20 @@ namespace API_Banco.Infrastructure.Repositories
 
         public async Task<CuentahabienteResumen?> ObtenerPorDpiAsync(string dpi, CancellationToken cancellationToken = default)
         {
-            var cliente = await _context.Clientes
+            return await _context.Clientes
                 .AsNoTracking()
-                .FirstOrDefaultAsync(c => c.Dpi == dpi, cancellationToken);
-
-            if (cliente is null) return null;
-
-            return new CuentahabienteResumen(cliente.IdCliente, cliente.Dpi, cliente.Nombre, cliente.Apellido);
+                .Where(c => c.Dpi == dpi)
+                .Select(c => new CuentahabienteResumen(
+                    c.IdCliente, c.Dpi, c.Nombre, c.Apellido, c.Nit, c.Celular, c.Email))
+                .FirstOrDefaultAsync(cancellationToken);
         }
 
         public async Task<IEnumerable<CuentahabienteResumen>> ObtenerTodosAsync(CancellationToken cancellationToken = default)
         {
             return await _context.Clientes
                 .AsNoTracking()
-                .Select(c => new CuentahabienteResumen(c.IdCliente, c.Dpi, c.Nombre, c.Apellido))
+                .Select(c => new CuentahabienteResumen(
+                    c.IdCliente, c.Dpi, c.Nombre, c.Apellido, c.Nit, c.Celular, c.Email))
                 .ToListAsync(cancellationToken);
         }
 
@@ -88,6 +87,12 @@ namespace API_Banco.Infrastructure.Repositories
             };
 
             await _context.UsuariosAcceso.AddAsync(acceso, cancellationToken);
+        }
+
+        public async Task<UsuarioAcceso?> ObtenerAccesoPorIdClienteAsync(int idCliente, CancellationToken cancellationToken = default)
+        {
+            return await _context.UsuariosAcceso
+                .FirstOrDefaultAsync(u => u.IdCliente == idCliente, cancellationToken);
         }
     }
 }

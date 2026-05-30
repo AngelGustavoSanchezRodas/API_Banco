@@ -38,4 +38,11 @@ public interface IClienteRepositorio
         string passwordHash,
         string rol,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Devuelve el usuario de acceso asociado al cuentahabiente <b>con tracking habilitado</b>
+    /// para poder actualizar la <c>password_hash</c> y confirmarlo con
+    /// <see cref="IUnidadDeTrabajo.GuardarCambiosAsync"/>.
+    /// </summary>
+    Task<UsuarioAcceso?> ObtenerAccesoPorIdClienteAsync(int idCliente, CancellationToken cancellationToken = default);
 }

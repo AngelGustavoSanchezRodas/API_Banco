@@ -29,4 +29,21 @@ public interface IOperacionesFinancierasServicio
         int idCuentaDestino,
         decimal monto,
         string descripcion);
+
+    /// <summary>
+    /// Suspende una cuenta ACTIVA: pasa a INACTIVA y todas sus tarjetas activas
+    /// quedan bloqueadas (INACTIVAS). Operación reservada al administrador.
+    /// La cuenta sigue pudiendo recibir transferencias (no se pierde el dinero).
+    /// </summary>
+    Task<ResultadoOperacion<CambioEstadoCuentaDto>> SuspenderCuentaAsync(
+        int idCuenta,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reactiva una cuenta previamente suspendida (INACTIVA → ACTIVA).
+    /// No re-emite tarjeta automáticamente: el admin debe emitir una nueva tras reactivar.
+    /// </summary>
+    Task<ResultadoOperacion<CambioEstadoCuentaDto>> ReactivarCuentaAsync(
+        int idCuenta,
+        CancellationToken cancellationToken = default);
 }

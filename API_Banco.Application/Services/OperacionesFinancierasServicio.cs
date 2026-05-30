@@ -17,6 +17,7 @@ public sealed class OperacionesFinancierasServicio(
     ITransaccionRepositorio transacciones,
     ITipoTransaccionRepositorio tiposTransaccion,
     IEstadoRepositorio estados,
+    ITarjetaDebitoRepositorio tarjetas,
     IUnidadDeTrabajo unidadDeTrabajo,
     IProveedorFecha fecha) : IOperacionesFinancierasServicio
 {
@@ -228,6 +229,10 @@ public sealed class OperacionesFinancierasServicio(
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
                 "Tipos de transacción TRANSFERENCIA_ORIGEN / TRANSFERENCIA_DESTINO no configurados.");
 
+        var idEstadoPendiente = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.PendienteActivacion).ConfigureAwait(false);
+        if (idEstadoPendiente is null)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Estado PENDIENTE_ACTIVACION no configurado.");
+
         var cuentaOrigen = await cuentas.ObtenerEntidadPorIdAsync(idCuentaOrigen).ConfigureAwait(false);
         if (cuentaOrigen is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta origen no existe.");
@@ -236,8 +241,15 @@ public sealed class OperacionesFinancierasServicio(
         if (cuentaDestino is null)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta destino no existe.");
 
-        if (cuentaOrigen.IdEstado != idEstadoActivo.Value || cuentaDestino.IdEstado != idEstadoActivo.Value)
-            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Ambas cuentas deben estar activas.");
+        // Origen DEBE estar ACTIVA (no puede operar si está INACTIVA o PENDIENTE).
+        if (cuentaOrigen.IdEstado != idEstadoActivo.Value)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta de origen no está activa.");
+
+        // Destino puede estar ACTIVA o INACTIVA (recibir dinero sigue permitido aunque
+        // el dueño no pueda operar). Lo único que rechazamos es PENDIENTE_ACTIVACION,
+        // porque la cuenta aún no fue habilitada por el banco.
+        if (cuentaDestino.IdEstado == idEstadoPendiente.Value)
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("La cuenta de destino aún no ha sido activada.");
 
         if (cuentaOrigen.Saldo < monto)
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("Saldo insuficiente.");
@@ -278,5 +290,101 @@ public sealed class OperacionesFinancierasServicio(
             ahora);
 
         return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Ok(resultado);
+    }
+
+    /// <inheritdoc />
+    public async Task<ResultadoOperacion<CambioEstadoCuentaDto>> SuspenderCuentaAsync(
+        int idCuenta,
+        CancellationToken cancellationToken = default)
+    {
+        if (idCuenta <= 0)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("La cuenta no es válida.");
+
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
+        var idEstadoInactivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Inactivo, cancellationToken).ConfigureAwait(false);
+        if (idEstadoActivo is null || idEstadoInactivo is null)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Estados ACTIVO / INACTIVO no configurados.");
+
+        var cuenta = await cuentas.ObtenerEntidadPorIdAsync(idCuenta, cancellationToken).ConfigureAwait(false);
+        if (cuenta is null)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("La cuenta no existe.");
+
+        if (cuenta.IdEstado != idEstadoActivo.Value)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Sólo se puede suspender una cuenta que está ACTIVA.");
+
+        var estadoAnterior = cuenta.IdEstado;
+        cuenta.IdEstado = idEstadoInactivo.Value;
+
+        // Bloquear todas las tarjetas activas (si una cuenta queda suspendida,
+        // su(s) tarjeta(s) deben quedar inservibles).
+        var tarjetasBloqueadas = await tarjetas
+            .BloquearTarjetasActivasDeCuentaAsync(idCuenta, idEstadoActivo.Value, idEstadoInactivo.Value, cancellationToken)
+            .ConfigureAwait(false);
+
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo(
+                "La cuenta fue modificada por otra operación. Reintenta.");
+        }
+
+        var dto = new CambioEstadoCuentaDto(
+            cuenta.IdCuenta,
+            cuenta.NoCuenta,
+            estadoAnterior,
+            idEstadoInactivo.Value,
+            CodigosEstado.Inactivo,
+            tarjetasBloqueadas,
+            fecha.ObtenerUtcAhora());
+
+        return ResultadoOperacion<CambioEstadoCuentaDto>.Ok(dto);
+    }
+
+    /// <inheritdoc />
+    public async Task<ResultadoOperacion<CambioEstadoCuentaDto>> ReactivarCuentaAsync(
+        int idCuenta,
+        CancellationToken cancellationToken = default)
+    {
+        if (idCuenta <= 0)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("La cuenta no es válida.");
+
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
+        var idEstadoInactivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Inactivo, cancellationToken).ConfigureAwait(false);
+        if (idEstadoActivo is null || idEstadoInactivo is null)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Estados ACTIVO / INACTIVO no configurados.");
+
+        var cuenta = await cuentas.ObtenerEntidadPorIdAsync(idCuenta, cancellationToken).ConfigureAwait(false);
+        if (cuenta is null)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("La cuenta no existe.");
+
+        if (cuenta.IdEstado != idEstadoInactivo.Value)
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo("Sólo se puede reactivar una cuenta que está INACTIVA.");
+
+        var estadoAnterior = cuenta.IdEstado;
+        cuenta.IdEstado = idEstadoActivo.Value;
+
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<CambioEstadoCuentaDto>.Fallo(
+                "La cuenta fue modificada por otra operación. Reintenta.");
+        }
+
+        var dto = new CambioEstadoCuentaDto(
+            cuenta.IdCuenta,
+            cuenta.NoCuenta,
+            estadoAnterior,
+            idEstadoActivo.Value,
+            CodigosEstado.Activo,
+            0,
+            fecha.ObtenerUtcAhora());
+
+        return ResultadoOperacion<CambioEstadoCuentaDto>.Ok(dto);
     }
 }

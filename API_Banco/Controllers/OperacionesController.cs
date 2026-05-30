@@ -73,6 +73,26 @@ namespace API_Banco.Controllers
                 : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
 
+        [HttpPost("suspender-cuenta/{idCuenta:int}")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> SuspenderCuenta(int idCuenta, CancellationToken cancellationToken)
+        {
+            var resultado = await _operacionesServicio.SuspenderCuentaAsync(idCuenta, cancellationToken);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
+        }
+
+        [HttpPost("reactivar-cuenta/{idCuenta:int}")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> ReactivarCuenta(int idCuenta, CancellationToken cancellationToken)
+        {
+            var resultado = await _operacionesServicio.ReactivarCuentaAsync(idCuenta, cancellationToken);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
+        }
+
         [HttpPost("transferir")]
         [Authorize(Roles = "CLIENTE")]
         public async Task<IActionResult> Transferir([FromBody] TransferirRequestDto dto, CancellationToken cancellationToken)
