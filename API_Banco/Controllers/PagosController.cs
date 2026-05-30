@@ -11,11 +11,13 @@ namespace API_Banco.Controllers
     /// <remarks>
     /// <para><b>Autenticación por endpoint:</b></para>
     /// <list type="bullet">
-    ///   <item><c>POST /api/Pagos/validar</c> y <c>GET /api/Pagos/consultar-deuda/...</c> son
-    ///     públicos (solo consulta/validación, no mueven dinero).</item>
-    ///   <item><c>POST /api/Pagos/ejecutar</c> exige autenticación: acepta <b>JWT</b> del cuentahabiente
-    ///     (frontend) o <b>API Key</b> (<c>X-Api-Key</c>) de los socios bancarios (Universidad,
-    ///     Energía, Telefonía) configurada en <c>Pagos:ApiKeysSocios</c>.</item>
+    ///   <item>Todos los endpoints son públicos en este proyecto académico para
+    ///     simplificar la integración con las APIs externas (Universidad, Energía,
+    ///     Telefonía) y sus frontends.</item>
+    ///   <item>La policy <c>"PortalOSocioBancario"</c> sigue registrada en
+    ///     <c>Program.cs</c> (acepta JWT o <c>X-Api-Key</c>). Para volver a proteger
+    ///     <c>POST /api/Pagos/ejecutar</c>, reemplaza <c>[AllowAnonymous]</c> en ese
+    ///     método por <c>[Authorize(Policy = "PortalOSocioBancario")]</c>.</item>
     /// </list>
     /// </remarks>
     [ApiController]
@@ -44,7 +46,7 @@ namespace API_Banco.Controllers
         }
 
         [HttpPost("ejecutar")]
-        [Authorize(Policy = "PortalOSocioBancario")]
+        [AllowAnonymous] // Académico: abierto a las APIs de Universidad/Energía/Telefonía sin token.
         public async Task<IActionResult> EjecutarPago([FromBody] PagoServicioDto dto)
         {
             var resultado = await _pagoServiciosServicio.EjecutarPagoServicioAsync(dto);
