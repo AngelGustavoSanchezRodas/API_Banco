@@ -116,6 +116,10 @@ INSERT INTO `cuenta_bancaria` (`id_cuenta`, `no_cuenta`, `id_cliente`, `id_tipo_
 -- 5. Único usuario administrador
 --    La password queda en texto plano; al primer login exitoso, el banco la
 --    rehashea con BCrypt (work factor 11) gracias al fallback transparente.
+--
+--    id_cliente queda en NULL porque un ADMIN no está atado a ningún
+--    cuentahabiente. La entidad UsuarioAcceso.IdCliente es `int?` en C#,
+--    así que EF Core lo materializa sin problema.
 -- -----------------------------------------------------------------------------
 INSERT INTO `usuario_acceso` (`id_cliente`, `nombre_usuario`, `correo_electronico`, `password_hash`, `rol`) VALUES
   (NULL, 'admin', 'admin@banco.local', 'Admin2026!', 'ADMIN');

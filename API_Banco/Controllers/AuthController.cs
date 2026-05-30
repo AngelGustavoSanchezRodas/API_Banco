@@ -60,12 +60,16 @@ namespace API_Banco.Controllers
             }
 
             // 1. Crear los "Claims" (Los datos cifrados dentro del token)
-            var claims = new[]
+            //    El claim idCliente sólo se emite cuando el usuario es un CLIENTE
+            //    (ADMIN no está atado a ningún cuentahabiente).
+            var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, usuario.IdUsuario.ToString()),
-                new Claim("idCliente", usuario.IdCliente.ToString()),
-                new Claim(ClaimTypes.Role, usuario.Rol) // ¡VITAL para que [Authorize(Roles="...")] funcione!
+                new(JwtRegisteredClaimNames.Sub, usuario.IdUsuario.ToString()),
+                new(ClaimTypes.Role, usuario.Rol)
             };
+
+            if (usuario.IdCliente.HasValue)
+                claims.Add(new Claim("idCliente", usuario.IdCliente.Value.ToString()));
 
             // 2. Traer la llave secreta del appsettings.json
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
@@ -95,6 +99,7 @@ namespace API_Banco.Controllers
 
     public sealed record LoginRequest(string Credencial, string Password);
 
-    // Nota: 'Rol' y 'IdCliente' deben coincidir con la desestructuración en el React
-    public sealed record LoginResponse(int IdUsuario, int IdCliente, string Rol, string Token);
+    // Nota: 'Rol' y 'IdCliente' deben coincidir con la desestructuración en el React.
+    //       IdCliente es null para usuarios ADMIN (no están atados a un cuentahabiente).
+    public sealed record LoginResponse(int IdUsuario, int? IdCliente, string Rol, string Token);
 }
