@@ -12,7 +12,8 @@ namespace API_Banco.Controllers
     [Authorize]
     public class BitacoraController(
         IBitacoraServicio bitacoraServicio,
-        ICuentaRepositorio cuentaRepositorio) : ControllerBase
+        ICuentaRepositorio cuentaRepositorio,
+        IAdminMetricasServicio adminMetricasServicio) : ControllerBase
     {
         [HttpGet("kardex/{idCuenta}")]
         [Authorize(Roles = "ADMIN,CLIENTE")]
@@ -38,6 +39,20 @@ namespace API_Banco.Controllers
             var filtro = new FiltroBitacoraDto(idCuenta, desde, hasta);
             var resultado = await bitacoraServicio.ObtenerKardexAsync(filtro, cancellationToken);
             return resultado.Exito ? Ok(resultado.Valor) : BadRequest(resultado.MensajeError);
+        }
+
+        /// <summary>
+        /// Métricas agregadas para el dashboard del rol ADMIN
+        /// (clientes registrados, operaciones del día, volumen mensual y
+        /// cuentas inactivas). Todas las cifras se calculan con queries
+        /// agregadas en BD para mantener la respuesta liviana.
+        /// </summary>
+        [HttpGet("metricas-admin")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> ObtenerMetricasAdmin(CancellationToken cancellationToken)
+        {
+            var metricas = await adminMetricasServicio.ObtenerMetricasAsync(cancellationToken);
+            return Ok(metricas);
         }
     }
 }

@@ -24,13 +24,16 @@ namespace API_Banco.Controllers
             _cuentaRepositorio = cuentaRepositorio;
         }
 
+        /// <summary>
+        /// Aplica un depósito a cualquier cuenta del banco.
+        /// Operación restringida a ADMIN: los clientes ya no pueden auto-depositar
+        /// desde el portal; el ingreso de efectivo se hace desde la consola admin
+        /// (ventanilla / corresponsalía).
+        /// </summary>
         [HttpPost("deposito")]
-        [Authorize(Roles = "CLIENTE")]
+        [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> Depositar([FromBody] DepositoDto dto, CancellationToken cancellationToken)
         {
-            var pertenece = await ClienteDelTokenEsDuenoDeAsync(dto.IdCuenta, cancellationToken);
-            if (!pertenece) return Forbid();
-
             var resultado = await _operacionesServicio.DepositarAsync(dto, cancellationToken);
             return resultado.Exito
                 ? Ok(resultado.Valor)
