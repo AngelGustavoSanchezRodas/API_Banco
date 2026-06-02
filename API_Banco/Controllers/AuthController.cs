@@ -34,16 +34,30 @@ namespace API_Banco.Controllers
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
         {
-            if (string.IsNullOrWhiteSpace(request.Credencial) || string.IsNullOrWhiteSpace(request.Password))
-                return Unauthorized();
+            if (request is null ||
+                string.IsNullOrWhiteSpace(request.Credencial) ||
+                string.IsNullOrWhiteSpace(request.Password))
+            {
+                return BadRequest(new
+                {
+                    error = "Debes proporcionar tu usuario/correo y tu contraseña.",
+                });
+            }
 
             // Tracking habilitado: si el password está en texto plano lo re-hasheamos
             // en este mismo request para migrar transparentemente al esquema BCrypt.
             var usuario = await _context.UsuariosAcceso
                 .FirstOrDefaultAsync(u => u.CorreoElectronico == request.Credencial || u.NombreUsuario == request.Credencial, cancellationToken);
 
+            // Mensaje genérico (mismo para usuario inexistente y password mal) para no filtrar
+            // información sobre qué usuarios existen en la base de datos.
             if (usuario is null || !_hasher.Verificar(request.Password, usuario.PasswordHash))
-                return Unauthorized();
+            {
+                return Unauthorized(new
+                {
+                    error = "Credenciales incorrectas. Verifica tu usuario y contraseña.",
+                });
+            }
 
             if (!_hasher.EsHashValido(usuario.PasswordHash))
             {
@@ -146,12 +160,12 @@ namespace API_Banco.Controllers
             var idUsuarioClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
                                   ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (!int.TryParse(idUsuarioClaim, out var idUsuario))
-                return Unauthorized();
+                return Unauthorized(new { error = "Sesión inválida. Vuelve a iniciar sesión." });
 
             var usuario = await _context.UsuariosAcceso
                 .FirstOrDefaultAsync(u => u.IdUsuario == idUsuario, cancellationToken);
             if (usuario is null)
-                return Unauthorized();
+                return Unauthorized(new { error = "Tu usuario ya no existe. Vuelve a iniciar sesión." });
 
             if (!_hasher.Verificar(request.PasswordActual, usuario.PasswordHash))
                 return BadRequest(new { error = "La contraseña actual no es correcta." });

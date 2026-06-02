@@ -19,6 +19,7 @@ public sealed class CuentahabienteServicio(
     INumeroCuentaGenerador numerosCuenta,
     INumeroTarjetaGenerador numerosTarjeta,
     IHasherCredenciales hasher,
+    IProveedorFecha fecha,
     IUnidadDeTrabajo unidadDeTrabajo) : ICuentahabienteServicio
 {
     /// <inheritdoc />
@@ -253,9 +254,12 @@ public sealed class CuentahabienteServicio(
     }
 
 
-    private static DateTime GenerarFechaVencimiento()
+    private DateTime GenerarFechaVencimiento()
     {
-        var ahora = DateTime.UtcNow;
+        // El vencimiento de la tarjeta se expresa al cliente (MM/AAAA), por lo
+        // que se calcula en hora local del banco (Guatemala) para evitar el
+        // off-by-one que se produce al final de mes si se calcula en UTC.
+        var ahora = fecha.ObtenerLocalAhora();
         return new DateTime(ahora.Year + 3, ahora.Month, 1).AddMonths(1).AddDays(-1);
     }
 

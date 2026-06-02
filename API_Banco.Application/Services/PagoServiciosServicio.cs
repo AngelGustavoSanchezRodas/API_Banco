@@ -384,6 +384,268 @@ public sealed class PagoServiciosServicio(
     }
 
     /// <inheritdoc />
+    public async Task<ResultadoOperacion<PagoVentanillaResultadoDto>> EjecutarPagoVentanillaAsync(
+        PagoVentanillaDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        // 1) Validaciones de entrada (idénticas al flujo del cliente para coherencia).
+        var identificador = dto.Identificador?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(identificador))
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("El identificador del servicio es obligatorio.");
+
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
+            {
+                return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                    "El número telefónico debe tener entre 8 y 15 dígitos (solo dígitos; se permiten espacios, guiones o paréntesis como separadores).");
+            }
+            identificador = digitos;
+        }
+        else if (!ValidadoresEntrada.EsIdentificadorServicioPlausible(identificador))
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("El identificador no es válido.");
+        }
+
+        if (!ValidadoresEntrada.EsMontoValido(dto.Monto))
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("El monto del pago debe ser mayor que cero.");
+
+        // 2) Validar identificador con la empresa prestadora.
+        ResultadoValidacion validacion;
+        try
+        {
+            validacion = await validadorIdentificador
+                .ValidarAsync(dto.TipoServicio, identificador, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex)
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                "No se pudo validar el identificador en el proveedor externo.",
+                ex.Message);
+        }
+        catch (JsonException ex)
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                "La respuesta del proveedor externo no tiene el formato esperado.",
+                ex.Message);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(ex.Message);
+        }
+
+        if (!validacion.EsValido)
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                validacion.Mensaje ?? "No se pudo validar el identificador ante la empresa.");
+
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia && !string.IsNullOrWhiteSpace(validacion.ReferenciaExterna))
+            identificador = validacion.ReferenciaExterna;
+
+        // 3) Consultar deuda y validar el monto entregado.
+        decimal deudaPendiente;
+        try
+        {
+            deudaPendiente = await consultaDeudaServicio
+                .ConsultarDeudaAsync(dto.TipoServicio, identificador, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                "No se pudo consultar la deuda pendiente del servicio.",
+                ex.Message);
+        }
+
+        if (dto.TipoServicio == TipoServicioPublico.Telefonia)
+        {
+            if (deudaPendiente > 0 && dto.Monto != deudaPendiente)
+                return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                    $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+        }
+        else
+        {
+            if (deudaPendiente <= 0)
+                return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("El servicio no tiene deuda pendiente.");
+            if (dto.Monto != deudaPendiente)
+                return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                    $"El monto debe coincidir con la deuda pendiente (Q{deudaPendiente:N2}).");
+        }
+
+        // 4) Resolver tipos de transacción y cuentas internas.
+        var idTipoIngresoEfectivo = await tiposTransaccion
+            .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.PagoVentanillaIngresoEfectivo, cancellationToken)
+            .ConfigureAwait(false);
+        var idTipoEgresoPrestadora = await tiposTransaccion
+            .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.PagoVentanillaTransferenciaPrestadora, cancellationToken)
+            .ConfigureAwait(false);
+        var idTipoPrestadora = await tiposTransaccion
+            .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.PagoServicioAcreditacionPrestadora, cancellationToken)
+            .ConfigureAwait(false);
+        var idTipoComision = await tiposTransaccion
+            .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.PagoServicioComisionBanco, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (idTipoIngresoEfectivo is null || idTipoEgresoPrestadora is null ||
+            idTipoPrestadora is null || idTipoComision is null)
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                "Faltan tipos de transacción configurados para pagos en ventanilla. " +
+                "Aplica el parche schema/add_tipos_pago_ventanilla.sql en la base de datos.");
+        }
+
+        int idCuentaPrestadora;
+        int idCuentaComisiones;
+        try
+        {
+            idCuentaPrestadora = await distribucion
+                .ObtenerIdCuentaPrestadoraAsync(dto.TipoServicio, cancellationToken)
+                .ConfigureAwait(false);
+            idCuentaComisiones = await distribucion
+                .ObtenerIdCuentaCorrienteComisionesBancoAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                "No se pudo resolver la configuración de cuentas para la distribución del pago.",
+                ex.Message);
+        }
+
+        if (idCuentaPrestadora == idCuentaComisiones)
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                "La cuenta prestadora no puede coincidir con la cuenta de comisiones.");
+
+        var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo, cancellationToken).ConfigureAwait(false);
+        if (idEstadoActivo is null)
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("Estado ACTIVO no configurado.");
+
+        var cuentaPrestadora = await cuentas.ObtenerEntidadPorIdAsync(idCuentaPrestadora, cancellationToken).ConfigureAwait(false);
+        if (cuentaPrestadora is null)
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("La cuenta de la empresa prestadora no existe.");
+        if (cuentaPrestadora.IdEstado != idEstadoActivo.Value)
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("La cuenta de la empresa prestadora no está activa.");
+
+        var cuentaComisiones = await cuentas.ObtenerEntidadPorIdAsync(idCuentaComisiones, cancellationToken).ConfigureAwait(false);
+        if (cuentaComisiones is null)
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("La cuenta de comisiones del banco no existe.");
+        if (cuentaComisiones.IdEstado != idEstadoActivo.Value)
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo("La cuenta de comisiones del banco no está activa.");
+
+        // 5) Distribución contable balanceada en la cuenta de comisiones (rol caja):
+        //
+        //   cuenta_comisiones :  +monto     (ingreso efectivo)
+        //   cuenta_comisiones :  -monto95   (transfer a prestadora)
+        //   cuenta_prestadora :  +monto95   (acreditación 95%)
+        //   cuenta_comisiones :  +comision5 (comisión banco 5%)
+        //
+        //   Saldo neto cuenta_comisiones = +comision5   (igual que flujo cliente)
+        //   Saldo neto cuenta_prestadora = +monto95
+        //
+        // Se ejecutan en el orden lógico contable, pero todas en la misma unidad
+        // de trabajo (un único SaveChanges) para mantener atomicidad.
+        var (montoPrestadora, comisionBanco) = DistribuidorPago95Por5.Calcular(dto.Monto);
+        var ahora = fecha.ObtenerUtcAhora();
+
+        cuentaComisiones.Acreditar(dto.Monto);          // entra efectivo
+        cuentaComisiones.Debitar(montoPrestadora);      // sale a prestadora
+        cuentaPrestadora.Acreditar(montoPrestadora);    // entra a prestadora
+        cuentaComisiones.Acreditar(comisionBanco);      // queda comisión
+
+        var transaccionIngreso = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaComisiones, idTipoIngresoEfectivo.Value, dto.Monto, ahora, cancellationToken)
+            .ConfigureAwait(false);
+        var transaccionEgresoPrestadora = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaComisiones, idTipoEgresoPrestadora.Value, montoPrestadora, ahora, cancellationToken)
+            .ConfigureAwait(false);
+        var transaccionAcreditacionPrestadora = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaPrestadora, idTipoPrestadora.Value, montoPrestadora, ahora, cancellationToken)
+            .ConfigureAwait(false);
+        var transaccionComision = await transacciones
+            .CrearMovimientoPendienteAsync(idCuentaComisiones, idTipoComision.Value, comisionBanco, ahora, cancellationToken)
+            .ConfigureAwait(false);
+
+        // 6) Registrar el pago de servicio. Apuntamos el "origen" a la transacción
+        //    de ingreso de efectivo, que es la primera del pipeline y representa
+        //    el evento de negocio "el banco recibió el dinero del cliente".
+        //
+        //    La referencia almacenada incluye el nombre/documento del pagador
+        //    cuando vienen, para tener trazabilidad de la persona física que pagó
+        //    en caja. La referencia libre del operador (si existe) se concatena.
+        var partesReferencia = new List<string> { "VENTANILLA" };
+        if (!string.IsNullOrWhiteSpace(dto.NombrePagador))
+            partesReferencia.Add(dto.NombrePagador!.Trim());
+        if (!string.IsNullOrWhiteSpace(dto.DocumentoPagador))
+            partesReferencia.Add(dto.DocumentoPagador!.Trim());
+        if (!string.IsNullOrWhiteSpace(dto.ReferenciaCliente))
+            partesReferencia.Add(dto.ReferenciaCliente!.Trim());
+        var referenciaUnificada = string.Join(" | ", partesReferencia);
+
+        var registroPago = new RegistroPagoServicio
+        {
+            TransaccionOrigen = transaccionIngreso,
+            EntidadServicio = CodigosEntidadServicio.ParaRegistro(dto.TipoServicio),
+            IdentificadorServicio = identificador,
+            MontoTotalPagado = dto.Monto,
+            MontoEmpresa95 = montoPrestadora,
+            ComisionBanco5 = comisionBanco
+        };
+
+        await registrosPago.RegistrarAsync(registroPago, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ResultadoOperacion<PagoVentanillaResultadoDto>.Fallo(
+                "La transacción no pudo completarse porque otra operación modificó las cuentas en paralelo. Intenta de nuevo.");
+        }
+
+        // 7) Notificar a la empresa prestadora. Si falla, el pago ya está
+        //    confirmado en BD; igual respondemos OK con notificacionEnviada=false
+        //    para que el operador sepa que debe conciliar manualmente.
+        var notificacion = new NotificacionPagoEmpresaDto(
+            dto.TipoServicio,
+            identificador,
+            dto.Monto,
+            referenciaUnificada,
+            transaccionIngreso.IdTransaccion.ToString(),
+            ahora);
+
+        var notificacionEnviada = true;
+        try
+        {
+            await notificacionEmpresa.NotificarPagoAcreditadoAsync(notificacion, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            notificacionEnviada = false;
+            logger.LogError(
+                ex,
+                "Notificación VENTANILLA falló | tipoServicio={Tipo} identificador={Identificador} monto={Monto} referencia={Referencia}. " +
+                "El cobro en caja ya está confirmado; se requiere conciliación manual con la prestadora.",
+                notificacion.TipoServicio,
+                notificacion.Identificador,
+                notificacion.MontoAcreditado,
+                notificacion.ReferenciaTransaccionBanco);
+        }
+
+        var resultado = new PagoVentanillaResultadoDto(
+            IdTransaccionIngresoEfectivo: transaccionIngreso.IdTransaccion,
+            IdTransaccionEgresoPrestadora: transaccionEgresoPrestadora.IdTransaccion,
+            IdTransaccionAcreditacionPrestadora: transaccionAcreditacionPrestadora.IdTransaccion,
+            IdTransaccionComisionBanco: transaccionComision.IdTransaccion,
+            MontoTotal: dto.Monto,
+            MontoAcreditadoPrestadora: montoPrestadora,
+            ComisionBanco: comisionBanco,
+            FechaUtc: ahora,
+            NotificacionEnviada: notificacionEnviada);
+
+        return ResultadoOperacion<PagoVentanillaResultadoDto>.Ok(resultado);
+    }
+
+    /// <inheritdoc />
     public async Task<ResultadoOperacion<decimal>> ConsultarDeudaAsync(int tipoServicio, string identificador)
     {
         if (!Enum.IsDefined(typeof(TipoServicioPublico), tipoServicio))

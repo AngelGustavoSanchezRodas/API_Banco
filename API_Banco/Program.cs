@@ -140,6 +140,7 @@ namespace API_Banco
             builder.Services.AddScoped<IOperacionesFinancierasServicio, OperacionesFinancierasServicio>();
             builder.Services.AddScoped<IPagoServiciosServicio, PagoServiciosServicio>();
             builder.Services.AddScoped<IBitacoraServicio, BitacoraServicio>();
+            builder.Services.AddScoped<IAdminMetricasServicio, AdminMetricasServicio>();
             builder.Services.AddSingleton<IProveedorFecha, ProveedorFechaSistema>();
             builder.Services.AddSingleton<IHasherCredenciales, HasherCredencialesBCrypt>();
 
