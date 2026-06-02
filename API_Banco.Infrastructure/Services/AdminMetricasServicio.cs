@@ -65,12 +65,17 @@ public sealed class AdminMetricasServicio : IAdminMetricasServicio
         // Tipos de transacción "primarios": los que cuentan como una operación
         // real desde el punto de vista del cliente (no las contrapartidas que
         // genera el banco internamente para que la bitácora cuadre).
+        //
+        // Incluimos PagoVentanillaIngresoEfectivo para que los pagos realizados
+        // en caja del banco también se reflejen en "operaciones hoy" y
+        // "volumen mensual", ya que son cobros reales que el banco generó.
         var codigosPrimarios = new[]
         {
             CodigosTipoTransaccion.Deposito,
             CodigosTipoTransaccion.Retiro,
             CodigosTipoTransaccion.TransferenciaOrigen,
             CodigosTipoTransaccion.PagoServicioDebitoCuentahabiente,
+            CodigosTipoTransaccion.PagoVentanillaIngresoEfectivo,
         };
 
         var idsTiposPrimarios = new List<int>(codigosPrimarios.Length);

@@ -16,5 +16,19 @@ public interface IPagoServiciosServicio
         PagoServicioDto dto,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Procesa un pago de servicios públicos recibido en ventanilla del banco
+    /// (modalidad efectivo, sin tarjeta ni PIN). Se mantiene la regla 95/5,
+    /// la validación del identificador y la notificación a la prestadora.
+    /// </summary>
+    /// <remarks>
+    /// Solo debe ser invocado desde endpoints que ya hayan verificado el rol
+    /// <c>ADMIN</c>; la regla de negocio asume que es un usuario del banco
+    /// quien está recibiendo el efectivo.
+    /// </remarks>
+    Task<ResultadoOperacion<PagoVentanillaResultadoDto>> EjecutarPagoVentanillaAsync(
+        PagoVentanillaDto dto,
+        CancellationToken cancellationToken = default);
+
     Task<ResultadoOperacion<decimal>> ConsultarDeudaAsync(int tipoServicio, string identificador);
 }

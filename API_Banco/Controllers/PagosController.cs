@@ -64,5 +64,28 @@ namespace API_Banco.Controllers
                 ? Ok(resultado.Valor)
                 : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
         }
+
+        /// <summary>
+        /// Registra un pago de servicio realizado físicamente en ventanilla del
+        /// banco (efectivo). No requiere tarjeta ni PIN: el operador del banco
+        /// recibe el dinero del cliente y el sistema lo distribuye 95/5.
+        /// </summary>
+        /// <remarks>
+        /// Restringido a <c>ADMIN</c> porque representa una operación de caja
+        /// realizada por personal del banco. Mantiene las mismas comisiones,
+        /// validaciones de identificador y notificación a la prestadora que el
+        /// flujo del cuentahabiente.
+        /// </remarks>
+        [HttpPost("ventanilla")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> EjecutarPagoVentanilla(
+            [FromBody] PagoVentanillaDto dto,
+            CancellationToken cancellationToken)
+        {
+            var resultado = await _pagoServiciosServicio.EjecutarPagoVentanillaAsync(dto, cancellationToken);
+            return resultado.Exito
+                ? Ok(resultado.Valor)
+                : BadRequest(new { mensaje = resultado.MensajeError, error = resultado.MensajeError, detalles = resultado.Detalles });
+        }
     }
 }

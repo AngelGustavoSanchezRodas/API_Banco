@@ -93,7 +93,13 @@ INSERT IGNORE INTO `tipo_transaccion` (`id_tipo_transaccion`, `descripcion`) VAL
   (4, 'PAGO_SERVICIO_ACREDITACION_PRESTADORA'),
   (5, 'PAGO_SERVICIO_COMISION_BANCO'),
   (6, 'TRANSFERENCIA_ORIGEN'),
-  (7, 'TRANSFERENCIA_DESTINO');
+  (7, 'TRANSFERENCIA_DESTINO'),
+  -- Pagos en ventanilla (efectivo): la cuenta de comisiones (id_cuenta = 100)
+  -- juega el rol de "caja" recibiendo el ingreso de efectivo y compensando el
+  -- 95% que se transfiere a la cuenta de la prestadora. La acreditación del 5%
+  -- sigue usando PAGO_SERVICIO_COMISION_BANCO para reutilizar reportes existentes.
+  (8, 'PAGO_VENTANILLA_INGRESO_EFECTIVO'),
+  (9, 'PAGO_VENTANILLA_TRANSFERENCIA_PRESTADORA');
 
 -- -----------------------------------------------------------------------------
 -- 4. Cliente del sistema + cuentas internas (indispensables para pagos)
