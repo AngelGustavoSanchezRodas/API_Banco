@@ -72,6 +72,9 @@ curl -s -X POST "%BASE%/api/Pagos/ejecutar" ^
 
 Cuando `Integraciones:TelefoniaApiUrl` apunta a la API publicada (no contiene `REEMPLAZAR`):
 
+- **URL base correcta:** `https://apitelefonia-....azurewebsites.net` (solo el host, **sin** `/api/Telefonia` al final).
+- Si se configuró con `/api/Telefonia`, el banco la normaliza automáticamente al desplegar la versión reciente.
+
 1. **Consulta de deuda:** `GET api/Telefonia/consultar/{telefono}` → campo `deuda_pendiente`.
 2. **Tras cobro exitoso:** `POST` a `TelefoniaNotificacionRutaRelativa` (por defecto `api/IntegracionBancaria/pago`) con header `X-Api-Key` si está configurado.
 

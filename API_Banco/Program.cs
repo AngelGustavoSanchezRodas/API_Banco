@@ -192,7 +192,8 @@ namespace API_Banco
             {
                 builder.Services.AddHttpClient("TelefoniaApi", client =>
                 {
-                    client.BaseAddress = new Uri(telUrlOriginal.TrimEnd('/') + "/");
+                    var baseUrl = IntegracionApiUrlNormalizer.NormalizarBaseTelefonia(telUrlOriginal);
+                    client.BaseAddress = new Uri(baseUrl.TrimEnd('/') + "/");
                     client.Timeout = TimeSpan.FromSeconds(30);
 
                     var apiKey = builder.Configuration["Integraciones:TelefoniaApiKey"];
