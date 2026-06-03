@@ -216,7 +216,7 @@ namespace API_Banco
 
             // Explorador Scalar + OpenAPI: solo Development. En Producción se ocultan
             // para no exponer la superficie completa del API ni facilitar fingerprinting.
-            if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+            if (app.Environment.IsDevelopment())
             {
                 app.MapScalarApiReference();
                 app.MapOpenApi();
