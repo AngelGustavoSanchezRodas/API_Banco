@@ -1,5 +1,6 @@
 ﻿using API_Banco.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace API_Banco.Infrastructure.Persistence
 {
@@ -8,6 +9,28 @@ namespace API_Banco.Infrastructure.Persistence
         public BancoDbContext(DbContextOptions<BancoDbContext> options) : base(options)
         {
         }
+
+        /// <summary>
+        /// Convertidor de zona horaria que asegura que TODOS los <c>DateTime</c>
+        /// persistidos en MySQL viajen como UTC.
+        ///
+        /// MySQL guarda <c>DATETIME</c> sin información de zona horaria, así que
+        /// EF Core los materializa por defecto con <c>DateTimeKind.Unspecified</c>.
+        /// Cuando .NET serializa un <c>Unspecified</c> a JSON, lo emite SIN el
+        /// sufijo <c>Z</c>, y el navegador lo interpreta como hora local del
+        /// usuario en lugar de UTC. Eso rompe el Kardex (las horas se ven en
+        /// la zona del cliente, no en Guatemala).
+        ///
+        ///   • Al escribir: si recibe Local, lo convierte a UTC; en cualquier
+        ///     otro caso lo persiste tal cual (asumiendo que el dominio ya
+        ///     trabaja en UTC vía IProveedorFecha).
+        ///   • Al leer: marca el valor como <c>DateTimeKind.Utc</c> para que la
+        ///     serialización JSON añada el sufijo <c>Z</c>.
+        /// </summary>
+        private static readonly ValueConverter<DateTime, DateTime> UtcDateTimeConverter =
+            new(
+                v => v.Kind == DateTimeKind.Local ? v.ToUniversalTime() : v,
+                v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
 
         public DbSet<Cliente> Clientes { get; set; }
         public DbSet<Cuenta> Cuentas { get; set; }
@@ -110,7 +133,11 @@ namespace API_Banco.Infrastructure.Persistence
 
                 entity.Property(e => e.IdTransaccion).HasColumnName("id_transaccion");
                 entity.Property(e => e.Monto).HasColumnName("monto");
-                entity.Property(e => e.Fecha).HasColumnName("fecha_transaccion");
+                entity.Property(e => e.Fecha)
+                    .HasColumnName("fecha_transaccion")
+                    // Garantiza que la fecha leída de MySQL viaje al frontend
+                    // como UTC (con sufijo Z), no como Unspecified.
+                    .HasConversion(UtcDateTimeConverter);
                 entity.Property(e => e.IdCuenta).HasColumnName("id_cuenta");
                 entity.Property(e => e.IdTipoTransaccion).HasColumnName("id_tipo_transaccion");
                 entity.Property(e => e.ReferenciaVinculante).HasColumnName("referencia_vinculante");

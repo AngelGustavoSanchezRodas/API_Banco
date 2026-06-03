@@ -69,9 +69,15 @@ namespace API_Banco.Infrastructure.Repositories
 
         public async Task<IEnumerable<CuentahabienteResumen>> ObtenerTodosAsync(CancellationToken cancellationToken = default)
         {
+            // Sin ORDER BY explícito, MySQL no garantiza un orden estable entre
+            // ejecuciones (depende del plan, paginación interna y caches). Para
+            // que el padrón en la consola admin se vea siempre en el mismo orden
+            // (y los clientes más recientes queden al final), ordenamos por
+            // id_cliente ascendente, que coincide con el orden de creación.
             return await _context.Clientes
                 .AsNoTracking()
                 .Where(c => c.Dpi != CodigosClienteSistema.Dpi)
+                .OrderBy(c => c.IdCliente)
                 .Select(c => new CuentahabienteResumen(
                     c.IdCliente, c.Dpi, c.Nombre, c.Apellido, c.Nit, c.Celular, c.Email))
                 .ToListAsync(cancellationToken);
