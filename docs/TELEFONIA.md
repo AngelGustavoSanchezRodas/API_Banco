@@ -10,7 +10,7 @@ El identificador es el **número telefónico** (8–15 dígitos). Se aceptan sep
 
 ## Reglas de cobro
 
-- **Postpago:** si hay deuda en `Integraciones:TelefoniaDemoPostpago` (o en la API de telefonía cuando esté configurada), el `monto` debe coincidir con la deuda consultada.
+- **Postpago:** si `Integraciones:TelefoniaApiUrl` está activa, el banco consulta `GET {Telefonia}/api/Telefonia/consultar/{telefono}`; si no, usa `Integraciones:TelefoniaDemoPostpago`. El `monto` del cobro debe coincidir con la deuda consultada.
 - **Prepago (recarga):** deuda `0`; cualquier `monto` > 0 válido según saldo de la tarjeta.
 - Misma lógica de tarjeta/PIN y distribución 95/5 que Universidad y Energía.
 
@@ -70,4 +70,9 @@ curl -s -X POST "%BASE%/api/Pagos/ejecutar" ^
 
 ## Callback a la API de Telefonía (opcional)
 
-Cuando `Integraciones:TelefoniaApiUrl` apunta a la API publicada (no contiene `REEMPLAZAR`), tras un cobro exitoso el banco intenta `POST` a `TelefoniaNotificacionRutaRelativa` (por defecto `api/IntegracionBancaria/pago`) con header `X-Api-Key` si está configurado. Si la URL no está activa, el cobro igual se confirma en el banco (solo se registra en logs).
+Cuando `Integraciones:TelefoniaApiUrl` apunta a la API publicada (no contiene `REEMPLAZAR`):
+
+1. **Consulta de deuda:** `GET api/Telefonia/consultar/{telefono}` → campo `deuda_pendiente`.
+2. **Tras cobro exitoso:** `POST` a `TelefoniaNotificacionRutaRelativa` (por defecto `api/IntegracionBancaria/pago`) con header `X-Api-Key` si está configurado.
+
+Si la URL no está activa, la consulta usa solo el catálogo demo y el cobro queda registrado en el banco sin acreditar en telefonía (log).

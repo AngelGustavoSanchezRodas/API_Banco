@@ -88,6 +88,9 @@ public sealed class GestorIntegracionServicios(
                 if (!TelefoniaIdentificador.TryNormalizar(identificador, out var digitos))
                     return 0m;
 
+                if (TelefoniaHttpEstaConfigurado())
+                    return await ConsultarDeudaTelefoniaHttpAsync(digitos, cancellationToken).ConfigureAwait(false);
+
                 return ObtenerDeudaTelefoniaDesdeConfiguracion(digitos);
             }
 
@@ -212,7 +215,28 @@ public sealed class GestorIntegracionServicios(
         return payload;
     }
 
-    // ---------------- Telefonía (demostración + callback HTTP opcional) ----------------
+    // ---------------- Telefonía (API publicada o catálogo demo) ----------------
+    private async Task<decimal> ConsultarDeudaTelefoniaHttpAsync(
+        string digitos,
+        CancellationToken cancellationToken)
+    {
+        var client = httpClientFactory.CreateClient(ClienteTelefonia);
+        using var response = await client
+            .GetAsync($"api/Telefonia/consultar/{Uri.EscapeDataString(digitos)}", cancellationToken)
+            .ConfigureAwait(false);
+
+        await EnsureSuccessAsync(response, "Telefonía", cancellationToken).ConfigureAwait(false);
+
+        var payload = await response.Content
+            .ReadFromJsonAsync<TelefoniaDeudaResponse>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (payload is null)
+            throw new JsonException("La API de Telefonía devolvió una respuesta vacía.");
+
+        return payload.DeudaPendiente < 0m ? 0m : payload.DeudaPendiente;
+    }
+
     private decimal ObtenerDeudaTelefoniaDesdeConfiguracion(string digitos)
     {
         var valorTexto = configuration[$"Integraciones:TelefoniaDemoPostpago:{digitos}"];
