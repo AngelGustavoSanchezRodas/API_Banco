@@ -87,6 +87,28 @@ namespace API_Banco.Controllers
             return Ok(resultado.Valor);
         }
 
+        /// <summary>
+        /// Actualiza los datos editables (nombre, apellido, NIT, celular y
+        /// correo) de un cuentahabiente existente. El DPI permanece inmutable.
+        /// Si el correo cambia, se sincroniza también con el correo del
+        /// usuario de acceso asociado.
+        /// </summary>
+        [HttpPut("{idCliente:int}")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> ActualizarPerfil(
+            int idCliente,
+            [FromBody] ActualizarCuentahabienteDto dto,
+            CancellationToken cancellationToken)
+        {
+            var resultado = await _cuentahabienteServicio
+                .ActualizarPerfilAsync(idCliente, dto, cancellationToken);
+
+            if (!resultado.Exito)
+                return BadRequest(new { error = resultado.MensajeError, detalles = resultado.Detalles });
+
+            return Ok(resultado.Valor);
+        }
+
         [HttpPost("tarjeta")]
         [Authorize(Roles = "ADMIN")] // [SEGURIDAD] Operación de escritura exclusiva para administradores
         public async Task<IActionResult> AsociarTarjeta([FromBody] AsociarTarjetaDebitoDto dto)

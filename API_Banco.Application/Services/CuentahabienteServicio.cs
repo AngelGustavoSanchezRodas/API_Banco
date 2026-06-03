@@ -99,6 +99,86 @@ public sealed class CuentahabienteServicio(
     }
 
     /// <inheritdoc />
+    public async Task<ResultadoOperacion<CuentahabienteActualizadoDto>> ActualizarPerfilAsync(
+        int idCliente,
+        ActualizarCuentahabienteDto dto,
+        CancellationToken cancellationToken = default)
+    {
+        if (idCliente <= 0)
+            return ResultadoOperacion<CuentahabienteActualizadoDto>.Fallo("El identificador de cliente no es válido.");
+
+        if (string.IsNullOrWhiteSpace(dto.Nombre) || string.IsNullOrWhiteSpace(dto.Apellido))
+            return ResultadoOperacion<CuentahabienteActualizadoDto>.Fallo("Nombre y apellido son obligatorios.");
+
+        if (string.IsNullOrWhiteSpace(dto.Nit))
+            return ResultadoOperacion<CuentahabienteActualizadoDto>.Fallo("El NIT es obligatorio.");
+
+        var nombre = dto.Nombre.Trim();
+        var apellido = dto.Apellido.Trim();
+        var nit = dto.Nit.Trim();
+        var celular = string.IsNullOrWhiteSpace(dto.Celular) ? null : dto.Celular.Trim();
+        var email = string.IsNullOrWhiteSpace(dto.Email) ? null : dto.Email.Trim();
+
+        var cliente = await clientes.ObtenerEntidadPorIdAsync(idCliente, cancellationToken).ConfigureAwait(false);
+        if (cliente is null)
+            return ResultadoOperacion<CuentahabienteActualizadoDto>.Fallo("No se encontró el cuentahabiente.");
+
+        // Defensa en profundidad: el cliente sistema (cuentas internas del banco)
+        // no debe ser modificable desde la consola admin.
+        if (string.Equals(cliente.Dpi, CodigosClienteSistema.Dpi, StringComparison.Ordinal))
+            return ResultadoOperacion<CuentahabienteActualizadoDto>.Fallo(
+                "No se permiten operaciones sobre el cliente sistema.");
+
+        // Si el correo cambió, validar unicidad excluyendo al propio cliente
+        // para evitar el falso positivo "el correo ya existe" cuando en realidad
+        // pertenece al mismo cuentahabiente que se está editando.
+        if (!string.IsNullOrEmpty(email) &&
+            !string.Equals(email, cliente.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var enUso = await clientes
+                .ExisteEmailEnOtroClienteAsync(email, idCliente, cancellationToken)
+                .ConfigureAwait(false);
+            if (enUso)
+                return ResultadoOperacion<CuentahabienteActualizadoDto>.Fallo(
+                    "El correo electrónico ya está registrado por otro cuentahabiente.");
+        }
+
+        // Aplicamos los cambios sobre la entidad ya trackeada por EF Core.
+        cliente.Nombre = nombre;
+        cliente.Apellido = apellido;
+        cliente.Nit = nit;
+        cliente.Celular = celular;
+        cliente.Email = email;
+
+        // Sincronizar el correo en usuario_acceso si el cliente tiene credenciales.
+        // El nombre_usuario sigue siendo el DPI (no cambia), pero el correo
+        // electrónico de contacto debe quedar alineado con el padrón.
+        if (!string.IsNullOrEmpty(email))
+        {
+            var acceso = await clientes
+                .ObtenerAccesoPorIdClienteAsync(idCliente, cancellationToken)
+                .ConfigureAwait(false);
+            if (acceso is not null && !string.Equals(acceso.CorreoElectronico, email, StringComparison.OrdinalIgnoreCase))
+            {
+                acceso.CorreoElectronico = email;
+            }
+        }
+
+        await unidadDeTrabajo.GuardarCambiosAsync(cancellationToken).ConfigureAwait(false);
+
+        var salida = new CuentahabienteActualizadoDto(
+            cliente.IdCliente,
+            cliente.Dpi,
+            cliente.Nombre,
+            cliente.Apellido,
+            cliente.Nit,
+            cliente.Celular,
+            cliente.Email);
+
+        return ResultadoOperacion<CuentahabienteActualizadoDto>.Ok(salida);
+    }
+
+    /// <inheritdoc />
     public async Task<ResultadoOperacion<CuentaAbiertaDto>> AbrirCuentaConSaldoInicialAsync(
         AbrirCuentaDto dto,
         CancellationToken cancellationToken = default)
