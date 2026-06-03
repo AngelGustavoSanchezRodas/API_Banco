@@ -11,6 +11,16 @@ public interface IClienteRepositorio
     Task<bool> ExisteDpiAsync(string dpi, CancellationToken cancellationToken = default);
     Task<bool> ExisteEmailAsync(string email, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Devuelve <c>true</c> si el correo está siendo usado por otro cliente
+    /// distinto al indicado. Sirve para validar la unicidad del email cuando
+    /// el cuentahabiente ya existe y solo está siendo editado.
+    /// </summary>
+    Task<bool> ExisteEmailEnOtroClienteAsync(
+        string email,
+        int idClienteActual,
+        CancellationToken cancellationToken = default);
+
     Task<CuentahabienteResumen?> ObtenerPorIdAsync(int idCliente, CancellationToken cancellationToken = default);
 
     Task<CuentahabienteResumen?> ObtenerPorDpiAsync(string dpi, CancellationToken cancellationToken = default);

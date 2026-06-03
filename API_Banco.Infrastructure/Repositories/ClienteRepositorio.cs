@@ -26,6 +26,18 @@ namespace API_Banco.Infrastructure.Repositories
             return await _context.Clientes.AnyAsync(c => c.Email == email, cancellationToken);
         }
 
+        public async Task<bool> ExisteEmailEnOtroClienteAsync(
+            string email,
+            int idClienteActual,
+            CancellationToken cancellationToken = default)
+        {
+            return await _context.Clientes
+                .AsNoTracking()
+                .AnyAsync(
+                    c => c.Email == email && c.IdCliente != idClienteActual,
+                    cancellationToken);
+        }
+
         public async Task<CuentahabienteResumen?> ObtenerPorIdAsync(int idCliente, CancellationToken cancellationToken = default)
         {
             // Excluimos al cliente sistema: no es un cuentahabiente real, no debe asomar
