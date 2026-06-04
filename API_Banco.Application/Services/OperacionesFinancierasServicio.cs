@@ -29,6 +29,13 @@ public sealed class OperacionesFinancierasServicio(
         if (!ValidadoresEntrada.EsMontoValido(dto.Monto))
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("El monto del depósito debe ser mayor que cero.");
 
+        // Blindaje contra errores de captura: no se aceptan depósitos por
+        // ventanilla que excedan el tope operativo. Para montos mayores
+        // existe el flujo manual de cumplimiento con doble validación.
+        if (!ValidadoresEntrada.EstaDentroDelTopeOperacion(dto.Monto))
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
+                $"El monto del depósito no puede exceder Q{ValidadoresEntrada.MontoMaximoOperacion:N2} por operación.");
+
         var idTipo = await tiposTransaccion
             .ObtenerIdPorCodigoDescripcionAsync(CodigosTipoTransaccion.Deposito, cancellationToken)
             .ConfigureAwait(false);
@@ -149,6 +156,13 @@ public sealed class OperacionesFinancierasServicio(
 
         if (!ValidadoresEntrada.EsMontoValido(montoDeposito))
             return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo("El monto del depósito debe ser mayor que cero.");
+
+        // Mismo tope que aplica a depósitos posteriores: la activación con
+        // saldo inicial no puede convertirse en una vía para bypassar el
+        // límite operativo del banco.
+        if (!ValidadoresEntrada.EstaDentroDelTopeOperacion(montoDeposito))
+            return ResultadoOperacion<MovimientoFinancieroResultadoDto>.Fallo(
+                $"El depósito de apertura no puede exceder Q{ValidadoresEntrada.MontoMaximoOperacion:N2}.");
 
         var idEstadoActivo = await estados.ObtenerIdPorCodigoAsync(CodigosEstado.Activo).ConfigureAwait(false);
         if (idEstadoActivo is null)
